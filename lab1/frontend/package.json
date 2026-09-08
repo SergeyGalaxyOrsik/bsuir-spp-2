@@ -1,0 +1,45 @@
+{
+  "name": "@spp2/frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "TanStack Start: серверный рендеринг страниц и формы",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 4000",
+    "build": "vite build",
+    "start": "vite preview --port 4000",
+    "generate-routes": "tsr generate",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .output .nitro .tanstack dist .turbo"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-devtools": "^0.10.12",
+    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-router-devtools": "^1.167.1",
+    "@tanstack/react-start": "^1.168.49",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cn": "^0.2.6",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.0.2",
+    "tailwindcss": "^4.1.18",
+    "tw-animate-css": "^1.3.6"
+  },
+  "devDependencies": {
+    "@tanstack/devtools-vite": "^0.8.5",
+    "@tanstack/router-cli": "^1.167.33",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  }
+}
