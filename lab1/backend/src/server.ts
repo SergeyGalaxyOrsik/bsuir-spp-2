@@ -22,7 +22,6 @@ export async function buildServer() {
   // Формы с файлами: multipart/form-data
   await app.register(multipart, {
     limits: { fileSize: config.maxFileSize, files: config.maxFiles },
-    // Не бросаем исключение на середине потока — обрезаем файл и сообщаем об этом сами.
     throwFileSizeLimit: false,
   })
   await app.register(fastifyStatic, {
@@ -31,10 +30,6 @@ export async function buildServer() {
     decorateReply: false,
   })
 
-  /**
-   * Ошибки валидации формы возвращают пользователя обратно на страницу
-   * с сообщением в query-параметре — без JSON-ответа в браузере.
-   */
   app.setErrorHandler<FormError | FastifyError>((error, request, reply) => {
     const isFormError = error instanceof FormError
     if (!isFormError) request.log.error(error)

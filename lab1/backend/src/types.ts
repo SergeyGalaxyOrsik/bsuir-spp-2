@@ -6,9 +6,7 @@ export type StatusFilter = (typeof STATUS_FILTERS)[number]
 
 export interface Attachment {
   id: string
-  /** Имя файла, как его назвал пользователь. */
   originalName: string
-  /** Имя файла на диске (uuid + расширение). */
   storedName: string
   mimeType: string
   size: number
@@ -20,7 +18,6 @@ export interface Task {
   title: string
   description: string
   status: TaskStatus
-  /** Ожидаемая дата завершения в формате YYYY-MM-DD либо null. */
   dueDate: string | null
   createdAt: string
   updatedAt: string

@@ -34,9 +34,7 @@ export const Route = createFileRoute('/')({
     notice: typeof search.notice === 'string' ? search.notice : undefined,
     error: typeof search.error === 'string' ? search.error : undefined,
   }),
-  // Сообщения из редиректов не влияют на выборку данных — в зависимости загрузчика не входят.
   loaderDeps: ({ search }) => ({ status: search.status, q: search.q }),
-  // Загрузчик выполняется на сервере при первом заходе: клиент получает готовый HTML.
   loader: ({ deps }) => fetchTasks(deps),
   component: TaskListPage,
 })
@@ -44,7 +42,6 @@ export const Route = createFileRoute('/')({
 function TaskListPage() {
   const { status, q, notice, error } = Route.useSearch()
   const { tasks, stats } = Route.useLoaderData()
-  /** Адрес текущей страницы — бэкенд вернёт сюда пользователя после обработки формы. */
   const returnTo = useRouterState({ select: (state) => state.location.href })
 
   return (

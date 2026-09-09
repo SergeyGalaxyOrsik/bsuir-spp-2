@@ -9,7 +9,6 @@ interface Database {
 }
 
 let db: Database = { tasks: [] }
-/** Очередь записи: гарантирует, что параллельные запросы не перетрут файл. */
 let writeChain: Promise<void> = Promise.resolve()
 
 function today(): string {
