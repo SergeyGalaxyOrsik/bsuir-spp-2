@@ -26,7 +26,7 @@ function seed(): Task[] {
     {
       id: randomUUID(),
       title: 'Прочитать методичку к лабораторной работе',
-      description: 'Разобраться с требованиями к серверному рендерингу и отправке форм.',
+      description: '',
       status: 'done',
       dueDate: day(-3),
       createdAt: now,
@@ -37,7 +37,7 @@ function seed(): Task[] {
     {
       id: randomUUID(),
       title: 'Реализовать загрузку вложений',
-      description: 'multipart/form-data, ограничение 10 МБ на файл.',
+      description: '',
       status: 'in_progress',
       dueDate: day(2),
       createdAt: now,
@@ -48,7 +48,7 @@ function seed(): Task[] {
     {
       id: randomUUID(),
       title: 'Сдать лабораторную работу',
-      description: 'Показать фильтрацию по статусу и сроки выполнения.',
+      description: '',
       status: 'todo',
       dueDate: day(-1),
       createdAt: now,

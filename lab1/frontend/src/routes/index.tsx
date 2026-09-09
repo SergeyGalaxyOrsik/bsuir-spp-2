@@ -54,10 +54,6 @@ function TaskListPage() {
             <Plus className="size-4" />
             Новая задача
           </CardTitle>
-          <CardDescription>
-            Форма отправляется как <code>multipart/form-data</code> прямо на Fastify — можно сразу
-            приложить файлы.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form
