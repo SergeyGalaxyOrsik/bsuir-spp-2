@@ -36,7 +36,6 @@ function serialize(task: Task) {
 }
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
-  /** Список задач с фильтрацией по статусу и поиском — используется для SSR. */
   app.get('/api/tasks', async (request: FastifyRequest<{ Querystring: { status?: string; q?: string } }>) => {
     const filter = isStatusFilter(request.query.status) ? request.query.status : 'all'
     const query = request.query.q ?? ''
