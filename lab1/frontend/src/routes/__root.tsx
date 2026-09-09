@@ -10,7 +10,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Список задач — SSR на TanStack Start и Fastify' },
+      { title: 'Список задач' },
       {
         name: 'description',
         content:
