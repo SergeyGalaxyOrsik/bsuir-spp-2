@@ -1,0 +1,20 @@
+{
+  "name": "lab2",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint"
+  }, 
+  "devDependencies": {
+    "@types/bun": "latest",
+    "turbo": "^2.11.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

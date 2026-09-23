@@ -1,0 +1,113 @@
+.recovery-timeline {
+  width: 100%;
+  max-width: 1640px;
+  margin-inline: auto;
+}
+
+.recovery-track {
+  display: grid;
+  grid-template-columns: 1.06fr repeat(3, 1fr);
+  align-items: stretch;
+  gap: 0;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.recovery-failure,
+.recovery-step {
+  position: relative;
+  min-height: 280px;
+  padding: 29px 33px 27px;
+  border-right: 1px solid var(--hair);
+}
+
+.recovery-failure { border-left: 1px solid var(--hair); background: color-mix(in srgb, var(--danger) 4%, var(--bg)); }
+.recovery-kicker { color: var(--fg-faint); font: 600 13px var(--font-mono); letter-spacing: .09em; }
+.recovery-failure .recovery-kicker { color: var(--danger); }
+.recovery-failure-title { display: flex; align-items: center; gap: 16px; margin-top: 34px; }
+.recovery-failure-title img { width: 62px; height: 62px; object-fit: contain; }
+.recovery-failure-title strong { font-size: 35px; letter-spacing: -.055em; }
+.recovery-failure p { margin-top: 20px; color: var(--fg-muted); font-size: 23px; line-height: 1.3; }
+.recovery-step { display: flex; flex-direction: column; align-items: flex-start; }
+.recovery-number { color: var(--control); font: 600 16px var(--font-mono); }
+.recovery-step > img { width: 56px; height: 56px; margin-top: 22px; object-fit: contain; }
+.recovery-step strong { margin-top: 16px; font-size: 26px; letter-spacing: -.04em; white-space: nowrap; }
+.recovery-step p { margin-top: 6px; color: var(--fg-muted); font-size: 19px; line-height: 1.3; }
+.recovery-artifact {
+  margin-top: auto;
+  padding: 7px 9px;
+  color: var(--control);
+  background: color-mix(in srgb, var(--control) 6%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--control) 28%, var(--hair));
+  border-radius: 4px;
+  font: 600 13px var(--font-mono);
+}
+.recovery-step::before {
+  content: '→';
+  position: absolute;
+  left: -13px;
+  top: 46%;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  color: var(--fg);
+  background: var(--bg);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.recovery-result {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 28px;
+  padding: 24px 31px;
+  border: 1.5px solid var(--work);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--work) 4%, var(--bg));
+}
+.recovery-result-icon { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 7px; background: var(--bg); }
+.recovery-result-icon img { width: 54px; height: 54px; object-fit: contain; }
+.recovery-result .recovery-kicker { color: var(--work); }
+.recovery-result strong { display: block; margin-top: 4px; font-size: 29px; letter-spacing: -.04em; }
+.recovery-result p { margin-top: 3px; color: var(--fg-muted); font-size: 19px; }
+.recovery-ready { margin-left: auto; color: var(--work); white-space: nowrap; font: 600 32px var(--font-mono); }
+
+@media (max-width: 900px) {
+  .recovery-track { grid-template-columns: repeat(2, 1fr); }
+  .recovery-failure, .recovery-step { min-height: 205px; padding: 20px; border-bottom: 1px solid var(--hair); }
+  .recovery-step:nth-child(3) { border-left: 1px solid var(--hair); }
+  .recovery-step::before { display: none; }
+  .recovery-failure-title { margin-top: 20px; }
+  .recovery-failure-title strong { font-size: 25px; }
+  .recovery-failure p { font-size: 16px; }
+  .recovery-step > img { width: 39px; height: 39px; margin-top: 12px; }
+  .recovery-step strong { margin-top: 8px; font-size: 19px; }
+  .recovery-step p { font-size: 15px; }
+  .recovery-artifact { margin-top: 12px; font-size: 10px; }
+  .recovery-result { padding: 15px; gap: 10px; }
+  .recovery-result-icon { width: 45px; height: 45px; }
+  .recovery-result-icon img { width: 31px; height: 31px; }
+  .recovery-result strong { font-size: 19px; }
+  .recovery-result p { font-size: 13px; }
+  .recovery-ready { font-size: 17px; }
+}
+
+@media (max-width: 520px) {
+  .recovery-failure, .recovery-step { min-height: 145px; padding: 10px; }
+  .recovery-kicker, .recovery-number { font-size: 10px; }
+  .recovery-failure-title { gap: 6px; margin-top: 12px; }
+  .recovery-failure-title img { width: 30px; height: 30px; }
+  .recovery-failure-title strong { font-size: 17px; }
+  .recovery-failure p { margin-top: 8px; font-size: 11px; }
+  .recovery-step > img { width: 28px; height: 28px; margin-top: 7px; }
+  .recovery-step strong { margin-top: 5px; font-size: 12px; white-space: normal; }
+  .recovery-step p { margin-top: 2px; font-size: 10px; }
+  .recovery-artifact { padding: 3px 4px; margin-top: 6px; font-size: 8px; }
+  .recovery-result { margin-top: 10px; padding: 9px; }
+  .recovery-result-icon { display: none; }
+  .recovery-result strong { font-size: 14px; }
+  .recovery-result p { font-size: 10px; }
+  .recovery-ready { font-size: 12px; }
+}

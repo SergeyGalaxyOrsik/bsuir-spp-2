@@ -1,0 +1,59 @@
+/* ===================================================================
+   THEME TOKENS — edit ONLY this :root block to re-theme the whole deck.
+   The SAME token vocabulary as the `slides` (Slidev) and `webdeck` skills,
+   so a brand looks identical across all of them. The values below are a
+   "dark product" default — REPLACE them to match the brief or the brand.
+   =================================================================== */
+:root {
+  /* Surfaces */
+  --bg: #fafafa;
+  --bg-grad-1: transparent;
+  --bg-grad-2: transparent;
+  --surface: #f5f5f5;
+  --surface-2: #eeeeee;
+
+  /* Ink */
+  --fg: #171717;
+  --fg-muted: #525252;
+  --fg-faint: #737373;
+
+  /* Hairlines */
+  --hair: #d4d4d4;
+  --hair-2: #e5e5e5;
+
+  /* Accent — ONE accent. May be a 2–4 stop gradient within ~80° of hue. */
+  --primary: #171717;
+  --accent: #171717;
+  --accent-ink: #fafafa;
+  --control: #326ce5;
+  --work: #16805d;
+  --warning: #a66a00;
+  --danger: #bd3f39;
+
+  /* Radius */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 10px;
+
+  /* Depth */
+  --shadow: none;
+  --glow: none;
+
+  /* Type */
+  --font-head: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  /* Motion */
+  --dur: 0.4s;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Atmosphere */
+  --grain: 0;
+  --vignette: transparent;
+
+  /* Responsive gutter — fluid side / vertical padding */
+  --gutter: clamp(28px, 6vw, 96px);
+  --gutter-y: clamp(32px, 6vh, 70px);
+}

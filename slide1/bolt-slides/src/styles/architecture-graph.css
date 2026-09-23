@@ -1,0 +1,161 @@
+.arch-figure {
+  width: 100%;
+  max-width: 1780px;
+  margin-inline: auto;
+}
+
+.arch-canvas {
+  position: relative;
+  width: 100%;
+  height: clamp(350px, 44vh, 500px);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.arch-apply .arch-canvas,
+.arch-kubelet .arch-canvas {
+  height: clamp(230px, 30vh, 310px);
+}
+
+.arch-replica .arch-canvas { height: clamp(350px, 44vh, 480px); }
+.arch-traffic .arch-canvas,
+.arch-cluster .arch-canvas { height: clamp(420px, 52vh, 565px); }
+
+.arch-cluster .arch-canvas::after {
+  content: '↕  обмен через Kubernetes API';
+  position: absolute;
+  z-index: 5;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 5px 13px;
+  color: var(--fg-muted);
+  background: var(--bg);
+  font: 600 13px var(--font-mono);
+  white-space: nowrap;
+}
+
+.arch-figure .react-flow {
+  background: transparent;
+}
+
+.arch-figure .react-flow__node {
+  border: 0;
+  background: transparent;
+}
+
+.arch-figure .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.arch-figure .react-flow__edge-textbg {
+  stroke: var(--hair-2);
+  stroke-width: 1px;
+}
+
+.arch-figure .react-flow__attribution {
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  font-size: 10px;
+}
+
+.arch-node {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 103px;
+  padding: 18px 20px;
+  border: 1.5px solid var(--hair);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: none;
+  font-family: var(--font-body);
+}
+
+.arch-node.arch-control { border-color: color-mix(in srgb, var(--control) 58%, var(--hair)); }
+.arch-node.arch-work { border-color: color-mix(in srgb, var(--work) 58%, var(--hair)); }
+.arch-node.arch-error { border-color: color-mix(in srgb, var(--danger) 65%, var(--hair)); background: color-mix(in srgb, var(--danger) 4%, var(--bg)); }
+.arch-node.arch-warn { border-style: dashed; border-color: color-mix(in srgb, var(--warning) 65%, var(--hair)); }
+
+.arch-icon {
+  display: block;
+  width: 51px;
+  height: 51px;
+  object-fit: contain;
+  flex: none;
+}
+
+.arch-node-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
+
+.arch-node-copy strong {
+  color: var(--fg);
+  font-size: 22px;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  white-space: nowrap;
+}
+
+.arch-node-copy span {
+  color: var(--fg-muted);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.arch-node em {
+  align-self: flex-end;
+  margin-left: auto;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--work) 40%, var(--hair));
+  border-radius: 4px;
+  color: var(--work);
+  white-space: nowrap;
+  font: 600 13px var(--font-mono);
+  font-style: normal;
+}
+
+.arch-zone {
+  width: 100%;
+  height: 100%;
+  padding: 18px 25px;
+  border: 1.5px solid var(--hair);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 42%, var(--bg));
+  font-family: var(--font-body);
+}
+
+.arch-zone.arch-control { border-color: color-mix(in srgb, var(--control) 55%, var(--hair)); }
+.arch-zone.arch-work { border-color: color-mix(in srgb, var(--work) 55%, var(--hair)); }
+.arch-zone strong {
+  color: var(--fg);
+  font: 600 16px var(--font-mono);
+  letter-spacing: .07em;
+}
+.arch-zone.arch-control strong { color: var(--control); }
+.arch-zone.arch-work strong { color: var(--work); }
+.arch-zone span {
+  margin-left: 17px;
+  color: var(--fg-muted);
+  font-size: 16px;
+}
+
+.arch-fallback { display: none; }
+
+@media (max-width: 800px) {
+  .arch-canvas { display: none; }
+  .arch-fallback { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch-figure * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
