@@ -4,6 +4,7 @@ import { buildApp } from '../src/app'
 import { loadConfig, type Config } from '../src/config'
 import { createPool } from '../src/db/pool'
 import { migrate } from '../src/db/migrate'
+import { repositoriesFor } from '../src/repositories'
 import type { Mailer } from '../src/mail/mailer'
 import type { FileStorage, StoredFile } from '../src/storage/file-storage'
 
@@ -70,7 +71,7 @@ export async function createTestContext(overrides: Partial<Config> = {}) {
   await migrate(pool, config.migrationsDir)
   const mailer = new RecordingMailer()
   const storage = new MemoryFileStorage()
-  const app = await buildApp({ config, mailer, storage })
+  const app = await buildApp({ config, mailer, storage, ...repositoriesFor(pool) })
 
   return {
     app,
