@@ -4,9 +4,16 @@ export const roleSchema = z.enum(['user', 'moderator', 'admin'])
 export const userStatusSchema = z.enum(['active', 'blocked'])
 export const promptModelSchema = z.enum(['gpt', 'claude', 'gemini', 'other'])
 
-export const emailSchema = z.email().max(254)
-export const passwordSchema = z.string().min(8).max(72)
-export const nameSchema = z.string().trim().min(2).max(50)
+export const emailSchema = z.email('Enter a valid email address').max(254, 'Email must be at most 254 characters')
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(72, 'Password must be at most 72 characters')
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Name must be at least 2 characters')
+  .max(50, 'Name must be at most 50 characters')
 
 export const userSchema = z.object({
   id: z.uuid(),
@@ -33,10 +40,13 @@ export const authResultSchema = z.object({
 })
 
 export const promptFieldsSchema = z.object({
-  title: z.string().trim().min(1).max(120),
-  body: z.string().trim().min(1).max(10000),
+  title: z.string().trim().min(1, 'Title is required').max(120, 'Title must be at most 120 characters'),
+  body: z.string().trim().min(1, 'Prompt text is required').max(10000, 'Prompt text must be at most 10000 characters'),
   model: promptModelSchema,
-  tags: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
+  tags: z
+    .array(z.string().trim().min(1, 'Tags cannot be empty').max(30, 'Each tag must be at most 30 characters'))
+    .max(10, 'Use at most 10 tags')
+    .default([]),
 })
 
 export const promptSchema = z.object({
