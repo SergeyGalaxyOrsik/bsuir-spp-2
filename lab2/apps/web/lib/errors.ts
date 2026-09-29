@@ -44,3 +44,8 @@ export function describeError(error: unknown): ErrorDescription {
   }
   return { message: FALLBACK_MESSAGE, fieldErrors: {}, retryAfterSeconds: null, status: null }
 }
+
+export function isGatewayFailure(response: Response) {
+  const isJson = (response.headers.get('content-type') ?? '').includes('json')
+  return response.status >= 500 && !isJson
+}

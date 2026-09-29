@@ -4,6 +4,7 @@ import type { ContractRouterClient } from '@orpc/contract'
 import type { JsonifiedClient } from '@orpc/openapi-client'
 import { OpenAPILink } from '@orpc/openapi-client/fetch'
 import { getAccessToken, notifySessionExpired, setAccessToken } from './auth-token'
+import { isGatewayFailure } from './errors'
 
 type ApiClient = JsonifiedClient<ContractRouterClient<typeof contract>>
 type AuthResult = Awaited<ReturnType<ApiClient['auth']['refresh']>>
@@ -39,6 +40,7 @@ export function refreshSession() {
 async function fetchWithRefresh(request: Request, init: RequestInit) {
   const retryRequest = request.clone()
   const response = await fetch(request, { ...init, credentials: 'include' })
+  if (isGatewayFailure(response)) throw new TypeError('The API is unreachable')
   const path = new URL(request.url).pathname
   const canRefresh = response.status === 401 && !PATHS_WITHOUT_REFRESH.some((prefix) => path.startsWith(prefix))
   if (!canRefresh || !(await refreshSession())) return response

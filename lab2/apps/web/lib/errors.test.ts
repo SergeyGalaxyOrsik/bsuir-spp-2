@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { ORPCError } from '@orpc/client'
-import { describeError } from './errors'
+import { describeError, isGatewayFailure } from './errors'
 
 test('validation errors become per-field messages keyed by the first path segment', () => {
   const error = new ORPCError('BAD_REQUEST', {
@@ -54,4 +54,13 @@ test('network failures are explained', () => {
 
 test('unknown throwables fall back to a generic message', () => {
   expect(describeError('boom').message).toBe('Something went wrong. Please try again.')
+})
+
+test('a non-JSON 5xx response means the API is unreachable behind the proxy', () => {
+  const proxyFailure = new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain' } })
+  const apiFailure = new Response('{"code":"INTERNAL_SERVER_ERROR"}', { status: 500, headers: { 'content-type': 'application/json' } })
+  const success = new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } })
+  expect(isGatewayFailure(proxyFailure)).toBe(true)
+  expect(isGatewayFailure(apiFailure)).toBe(false)
+  expect(isGatewayFailure(success)).toBe(false)
 })
