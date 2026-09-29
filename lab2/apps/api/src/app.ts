@@ -2,7 +2,7 @@ import rateLimit from '@fastify/rate-limit'
 import { OpenAPIHandler } from '@orpc/openapi/fastify'
 import { ORPCError } from '@orpc/server'
 import { ResponseHeadersPlugin } from '@orpc/server/plugins'
-import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from 'fastify'
+import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { Config } from './config'
 import type { ApiContext, RequestLogger, Services } from './context'
 import { buildLoggerOptions, registerRequestLogging, requestIdFrom } from './logging'
@@ -57,9 +57,9 @@ async function registerRateLimit(app: FastifyInstance, config: Config) {
   })
 }
 
-export async function buildApp(services: AppDependencies) {
+export async function buildApp(services: AppDependencies, options: { logger?: FastifyBaseLogger } = {}) {
   const app = Fastify({
-    logger: buildLoggerOptions(services.config),
+    ...(options.logger ? { loggerInstance: options.logger } : { logger: buildLoggerOptions(services.config) }),
     logController: new LogController({ disableRequestLogging: true }),
     genReqId: requestIdFrom,
     trustProxy: true,
