@@ -1,5 +1,5 @@
 import { DiskFileStorage } from './storage/file-storage'
-import { SmtpMailer } from './mail/mailer'
+import { createMailer } from './mail/create-mailer'
 import { buildApp } from './app'
 import { loadConfig } from './config'
 import { migrate } from './db/migrate'
@@ -14,7 +14,7 @@ await migrate(pool, config.migrationsDir)
 
 const services = {
   config,
-  mailer: new SmtpMailer(config.smtp),
+  mailer: createMailer(config),
   storage: new DiskFileStorage(config.uploadsDir),
   ...repositoriesFor(pool),
 }

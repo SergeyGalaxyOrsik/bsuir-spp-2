@@ -13,6 +13,7 @@ const environmentSchema = z.object({
   WEB_URL: z.string().default('http://localhost:3000'),
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().int().default(1025),
+  RESEND_API_KEY: z.string().default(''),
   MAIL_FROM: z.string().default('Prompt Library <no-reply@prompts.local>'),
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
@@ -42,6 +43,7 @@ export function loadConfig(environment: Record<string, string | undefined>) {
     uploadsDir: resolve(env.UPLOADS_DIR),
     migrationsDir: resolve('migrations'),
     webUrl: env.WEB_URL,
+    resendApiKey: env.RESEND_API_KEY || null,
     smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, from: env.MAIL_FROM },
     admin:
       env.ADMIN_EMAIL && env.ADMIN_PASSWORD
