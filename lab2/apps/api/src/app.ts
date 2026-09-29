@@ -62,7 +62,7 @@ export async function buildApp(services: AppDependencies, options: { logger?: Fa
     ...(options.logger ? { loggerInstance: options.logger } : { logger: buildLoggerOptions(services.config) }),
     logController: new LogController({ disableRequestLogging: true }),
     genReqId: requestIdFrom,
-    trustProxy: true,
+    trustProxy: services.config.trustProxy,
   })
 
   app.removeAllContentTypeParsers()
@@ -72,6 +72,15 @@ export async function buildApp(services: AppDependencies, options: { logger?: Fa
 
   const requestBodyLimitBytes = services.config.maxAttachmentBytes + 1024 * 1024
   app.addHook('onRequest', async (request, reply) => {
+    const isChunkedWithoutLength = request.headers['transfer-encoding'] && !request.headers['content-length']
+    if (isChunkedWithoutLength) {
+      return reply.status(411).send({
+        defined: false,
+        code: 'LENGTH_REQUIRED',
+        status: 411,
+        message: 'Content-Length header is required',
+      })
+    }
     if (Number(request.headers['content-length'] ?? 0) > requestBodyLimitBytes) {
       return reply.status(413).send({
         defined: false,

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { PAGE_SIZE, usePrompts, type PromptFilters } from '@/hooks/use-prompts'
 import { describeError } from '@/lib/errors'
+import { clampPage } from '@/lib/pagination'
 
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -28,6 +29,11 @@ export default function LibraryPage() {
 
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS)
   const prompts = usePrompts({ search: debouncedSearch, model, mine, page })
+
+  if (prompts.data) {
+    const clampedPage = clampPage(page, prompts.data.total, PAGE_SIZE)
+    if (clampedPage !== page) setPage(clampedPage)
+  }
 
   const resetPageAnd = <Value,>(setter: (value: Value) => void) => (value: Value) => {
     setter(value)

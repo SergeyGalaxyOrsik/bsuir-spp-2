@@ -8,6 +8,7 @@ const environmentSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
   COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
+  TRUST_PROXY: z.string().default(''),
   UPLOADS_DIR: z.string().default('./uploads'),
   WEB_URL: z.string().default('http://localhost:3000'),
   SMTP_HOST: z.string().default('localhost'),
@@ -20,6 +21,14 @@ const environmentSchema = z.object({
   RATE_LIMIT_GLOBAL_MAX: z.coerce.number().int().default(300),
 })
 
+function trustedProxiesFrom(value: string) {
+  const addresses = value
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean)
+  return addresses.length > 0 ? addresses : false
+}
+
 export function loadConfig(environment: Record<string, string | undefined>) {
   const env = environmentSchema.parse(environment)
   return {
@@ -29,6 +38,7 @@ export function loadConfig(environment: Record<string, string | undefined>) {
     databaseUrl: env.DATABASE_URL,
     jwtSecret: env.JWT_SECRET,
     cookieSecure: env.COOKIE_SECURE === 'true',
+    trustProxy: trustedProxiesFrom(env.TRUST_PROXY),
     uploadsDir: resolve(env.UPLOADS_DIR),
     migrationsDir: resolve('migrations'),
     webUrl: env.WEB_URL,
