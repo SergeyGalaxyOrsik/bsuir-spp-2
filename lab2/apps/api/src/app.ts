@@ -69,6 +69,18 @@ export async function buildApp(services: AppDependencies) {
   app.addContentTypeParser('*', (_request, _payload, done) => done(null, undefined))
 
   registerRequestLogging(app)
+
+  const requestBodyLimitBytes = services.config.maxAttachmentBytes + 1024 * 1024
+  app.addHook('onRequest', async (request, reply) => {
+    if (Number(request.headers['content-length'] ?? 0) > requestBodyLimitBytes) {
+      return reply.status(413).send({
+        defined: false,
+        code: 'PAYLOAD_TOO_LARGE',
+        status: 413,
+        message: 'Request body is too large',
+      })
+    }
+  })
   await registerRateLimit(app, services.config)
 
   const handler = new OpenAPIHandler(router, {

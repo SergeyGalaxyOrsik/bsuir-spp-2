@@ -128,10 +128,8 @@ export async function multipart(fields: Record<string, string | File>) {
   const form = new FormData()
   for (const [name, value] of Object.entries(fields)) form.append(name, value)
   const response = new Response(form)
-  return {
-    payload: Buffer.from(await response.arrayBuffer()),
-    contentType: response.headers.get('content-type') ?? '',
-  }
+  const contentType = response.headers.get('content-type') ?? ''
+  return { payload: Buffer.from(await response.arrayBuffer()), contentType }
 }
 
 export function cookieHeaderFrom(setCookie: string[]) {
