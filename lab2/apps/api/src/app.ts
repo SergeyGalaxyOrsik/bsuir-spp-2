@@ -4,7 +4,7 @@ import { ORPCError } from '@orpc/server'
 import { ResponseHeadersPlugin } from '@orpc/server/plugins'
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { Config } from './config'
-import type { ApiContext, Services } from './context'
+import type { ApiContext, RequestLogger, Services } from './context'
 import { buildLoggerOptions, registerRequestLogging, requestIdFrom } from './logging'
 import { router } from './router'
 import { parseCookies } from './security/cookies'
@@ -29,7 +29,7 @@ function isStrictRateLimited(request: FastifyRequest) {
 function createContext(request: FastifyRequest, services: Services): ApiContext {
   return {
     services,
-    log: request.log,
+    log: request.log as RequestLogger,
     ip: request.ip,
     userAgent: request.headers['user-agent'] ?? '',
     authorization: request.headers.authorization,

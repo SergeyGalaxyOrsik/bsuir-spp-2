@@ -8,9 +8,17 @@ export function parseCookies(header: string | undefined) {
     if (separatorIndex === -1) continue
     const name = pair.slice(0, separatorIndex).trim()
     const value = pair.slice(separatorIndex + 1).trim()
-    if (name) cookies[name] = decodeURIComponent(value)
+    if (name) cookies[name] = decodeCookieValue(value)
   }
   return cookies
+}
+
+function decodeCookieValue(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 export function serializeRefreshCookie(token: string, maxAgeSeconds: number, secure: boolean) {

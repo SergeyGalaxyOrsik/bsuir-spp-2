@@ -133,3 +133,31 @@ export async function multipart(fields: Record<string, string | File>) {
     contentType: response.headers.get('content-type') ?? '',
   }
 }
+
+export function cookieHeaderFrom(setCookie: string[]) {
+  return setCookie.map((cookie) => cookie.split(';')[0]).join('; ')
+}
+
+export async function registerUser(
+  app: TestContext['app'],
+  overrides: { email?: string; name?: string; password?: string } = {},
+) {
+  const credentials = {
+    email: `user-${randomUUID()}@example.com`,
+    name: 'Test User',
+    password: 'password123',
+    ...overrides,
+  }
+  const response = await call(app, 'POST', '/auth/register', { body: credentials })
+  return {
+    credentials,
+    response,
+    accessToken: response.body.accessToken as string,
+    user: response.body.user as { id: string; email: string; role: string },
+    refreshCookie: cookieHeaderFrom(response.setCookie),
+  }
+}
+
+export async function promoteUser(pool: TestContext['pool'], userId: string, role: 'user' | 'moderator' | 'admin') {
+  await pool.query('update users set role = $2 where id = $1', [userId, role])
+}

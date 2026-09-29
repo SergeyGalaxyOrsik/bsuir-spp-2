@@ -18,12 +18,14 @@ export type Services = {
   prompts: PromptsRepository
 }
 
+export type RequestLogger = FastifyBaseLogger & { setBindings(bindings: Record<string, unknown>): void }
+
 export type RequestContext = ResponseHeadersPluginContext & {
   ip: string
   userAgent: string
   authorization: string | undefined
   cookies: Record<string, string>
-  log: FastifyBaseLogger
+  log: RequestLogger
 }
 
 export type ApiContext = RequestContext & { services: Services }
