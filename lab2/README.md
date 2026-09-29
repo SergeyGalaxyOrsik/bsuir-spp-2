@@ -9,7 +9,7 @@ A library of AI prompts: Next.js SPA + Fastify/oRPC REST API + PostgreSQL, run w
 
 - App: http://localhost:3000
 - API: http://localhost:3001 (all routes under `/api`, also proxied at `http://localhost:3000/api`)
-- Mail catcher (password reset emails): http://localhost:8025
+- Password reset emails: sent through Resend when `RESEND_API_KEY` is set in `.env` (the sender is `MAIL_FROM`, its domain must be verified in Resend). Without a key they go to the local Mailpit catcher at http://localhost:8025
 - Seeded admin: credentials from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`
 
 Host ports can be changed with `WEB_PORT`, `API_PORT`, `DB_PORT` and `MAILPIT_PORT` in `.env`. When `WEB_PORT` changes, set `WEB_URL` to match: password reset links are built from it.
