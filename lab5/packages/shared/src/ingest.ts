@@ -85,25 +85,36 @@ export async function startRun(
   mode: IngestMode,
   triggeredBy: string,
 ): Promise<StartResult | null> {
+  const lockKey = `ingest:${collector.source}`;
   const conn = await sql.reserve();
-  const [lock] = await conn`select pg_try_advisory_lock(hashtext(${`ingest:${collector.source}`})) as ok`;
+  const [lock] = await conn`select pg_try_advisory_lock(hashtext(${lockKey})) as ok`;
   if (!lock?.ok) {
     conn.release();
     return null;
   }
+  const releaseLock = async () => {
+    await conn`select pg_advisory_unlock(hashtext(${lockKey}))`.catch(() => undefined);
+    conn.release();
+  };
 
-  // Holding the lock proves no live process is running this source: anything still marked
-  // running was interrupted (crash, kill, deploy) and is closed out here.
-  await sql`
-    update ops.ingest_runs set status = 'interrupted', finished_at = now(), error = 'process stopped before completion'
-    where source = ${collector.source} and status = 'running'`;
+  let runId: number;
+  try {
+    // Holding the lock proves no live process is running this source: anything still marked
+    // running was interrupted (crash, kill, deploy) and is closed out here.
+    await sql`
+      update ops.ingest_runs set status = 'interrupted', finished_at = now(), error = 'process stopped before completion'
+      where source = ${collector.source} and status = 'running'`;
 
-  const [row] = await sql`
-    insert into ops.ingest_runs (source, mode, triggered_by, host, message)
-    values (${collector.source}, ${mode}, ${triggeredBy}, ${process.env.HOSTNAME ?? "local"}, 'starting')
-    returning id`;
-  const runId = Number(row!.id);
-  await notify(sql, runId);
+    const [row] = await sql`
+      insert into ops.ingest_runs (source, mode, triggered_by, host, message)
+      values (${collector.source}, ${mode}, ${triggeredBy}, ${process.env.HOSTNAME ?? "local"}, 'starting')
+      returning id`;
+    runId = Number(row!.id);
+    await notify(sql, runId);
+  } catch (error) {
+    await releaseLock();
+    throw error;
+  }
 
   const runLog = log.child({ source: collector.source, runId, mode });
   let fetched = 0;
@@ -175,8 +186,7 @@ export async function startRun(
       runLog.error({ err: message }, "ingest failed");
     } finally {
       await notify(sql, runId).catch(() => undefined);
-      await conn`select pg_advisory_unlock(hashtext(${`ingest:${collector.source}`}))`.catch(() => undefined);
-      conn.release();
+      await releaseLock();
     }
   })();
 

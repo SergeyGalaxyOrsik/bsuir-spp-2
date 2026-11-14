@@ -71,6 +71,11 @@ function rgba(hex: string, alpha: number) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha.toFixed(2)})`
 }
 
+function applyAutoRotate(controls: ReturnType<GlobeMethods["controls"]>, enabled: boolean) {
+  controls.autoRotate = enabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  controls.autoRotateSpeed = 0.35
+}
+
 const tooltip = (title: string, lines: string[]) =>
   `<div style="background:rgba(9,9,11,.88);color:#fafafa;padding:6px 9px;border-radius:6px;font:12px/1.4 system-ui;max-width:260px">
      <div style="font-weight:600">${title.replace(/</g, "&lt;")}</div>
@@ -105,10 +110,7 @@ export default function LiveGlobe({ quakes, hazards, tracks, rings, dark, autoRo
 
   useEffect(() => {
     const controls = globe.current?.controls()
-    if (!controls) return
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    controls.autoRotate = autoRotate && !reduced
-    controls.autoRotateSpeed = 0.35
+    if (controls) applyAutoRotate(controls, autoRotate)
   }, [autoRotate, size.width])
 
   useImperativeHandle(handle, () => ({
@@ -127,8 +129,7 @@ export default function LiveGlobe({ quakes, hazards, tracks, rings, dark, autoRo
     controls.minDistance = 120
     controls.maxDistance = 900
     controls.zoomSpeed = 0.8
-    controls.autoRotate = autoRotate
-    controls.autoRotateSpeed = 0.35
+    applyAutoRotate(controls, autoRotate)
   }
 
   // Hazard markers are DOM nodes (pulsing dots), so they read differently from the quake discs.

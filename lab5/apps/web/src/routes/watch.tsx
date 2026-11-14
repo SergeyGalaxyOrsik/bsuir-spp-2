@@ -5,7 +5,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/app/common"
 import { MagnitudeBadge } from "@/components/app/magnitude"
-import { EmptyState, ErrorState } from "@/components/app/states"
+import { EmptyState, ErrorState, PartialErrors } from "@/components/app/states"
 import { WorldMap } from "@/components/app/world-map"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { graphql } from "@/graphql/gen"
 import type { WatchZonesQuery as WatchZonesData } from "@/graphql/gen/graphql"
 import { fmtDate, fmtDateTime, fmtFixed, fmtNumber } from "@/lib/format"
-import { execute } from "@/lib/graphql"
+import { execute, executeRaw } from "@/lib/graphql"
 import { cn } from "@/lib/utils"
 
 const WatchZonesQuery = graphql(`
@@ -100,7 +100,7 @@ const DAYS = [7, 30, 90, 365] as const
 const zonesQuery = (days: number) =>
   queryOptions({
     queryKey: ["watchZones", days],
-    queryFn: () => execute(WatchZonesQuery, { days }),
+    queryFn: () => executeRaw(WatchZonesQuery, { days }),
   })
 
 export const Route = createFileRoute("/watch")({
@@ -145,7 +145,8 @@ function WatchPage() {
   const days = search.days ?? 30
   const navigate = useNavigate({ from: Route.fullPath })
   const queryClient = useQueryClient()
-  const { data, error, refetch, isFetching } = useQuery(zonesQuery(days))
+  const { data: result, error, refetch, isFetching } = useQuery(zonesQuery(days))
+  const data = result?.data
   const [form, setForm] = useState<FormState | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -243,6 +244,7 @@ function WatchPage() {
         }
       />
 
+      <PartialErrors errors={result?.errors ?? []} />
       {error && !data ? (
         <ErrorState error={error} onRetry={() => refetch()} />
       ) : (

@@ -79,10 +79,11 @@ export function supergraphLoader(subgraphs: SubgraphConfig[], log: Logger) {
         if (attempt >= 3 && existsSync(fallback)) {
           log.warn({ err: (error as Error).message }, "live composition failed, serving bundled supergraph.graphql");
           // Point the bundled graph at this deployment's subgraph URLs.
-          return subgraphs.reduce(
+          lastGood = subgraphs.reduce(
             (sdl, sg) => sdl.replace(new RegExp(`(name: "${sg.name}", url: )"[^"]*"`), `$1"${sg.url}"`),
             readFileSync(fallback, "utf8"),
           );
+          return lastGood;
         }
         if (attempt >= 60) throw error;
         log.warn({ attempt, err: (error as Error).message }, "subgraphs not ready, retrying composition");

@@ -50,12 +50,18 @@ export function WorldMap({
   onMapClick?: (coords: { latitude: number; longitude: number }) => void
 }) {
   const [hover, setHover] = useState<MapPoint | null>(null)
+  const coords: [number, number][] = fit
+    ? [
+        ...points.map((p): [number, number] => [p.longitude, p.latitude]),
+        ...circles.map((c): [number, number] => [c.longitude, c.latitude]),
+      ]
+    : []
+  const coordsKey = JSON.stringify(coords)
   const { projection, landPath, graticule } = useMemo(() => {
     const projection = geoEqualEarth()
-    const coords = [...points.map((p) => [p.longitude, p.latitude]), ...circles.map((c) => [c.longitude, c.latitude])]
-    if (fit && coords.length > 0) {
-      const lons = coords.map((c) => c[0]!)
-      const lats = coords.map((c) => c[1]!)
+    if (coords.length > 0) {
+      const lons = coords.map((c) => c[0])
+      const lats = coords.map((c) => c[1])
       const pad = 6
       const [w, e] = [Math.max(-180, Math.min(...lons) - pad), Math.min(180, Math.max(...lons) + pad)]
       const [s2, n] = [Math.max(-85, Math.min(...lats) - pad), Math.min(85, Math.max(...lats) + pad)]
@@ -73,7 +79,7 @@ export function WorldMap({
     return { projection, landPath: path(land) ?? "", graticule: path(geoGraticule10()) ?? "" }
     // Refit only when the set of locations changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fit, fit ? JSON.stringify(points.map((p) => [p.longitude, p.latitude])) : ""])
+  }, [coordsKey])
 
   const circlePaths = useMemo(() => {
     const path = geoPath(projection)

@@ -14,7 +14,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { subgraphsFromEnv, supergraphLoader } from "./compose.ts";
 import { useSubgraphCircuitBreaker } from "./subgraph-breaker.ts";
-import { clientIp, concurrencyLimit, rateLimit } from "./load-control.ts";
+import { clientIp, concurrencyLimit, rateLimit, streamLimit } from "./load-control.ts";
 
 const log = createLogger("gateway");
 const production = process.env.NODE_ENV === "production";
@@ -130,11 +130,10 @@ app.use(
 );
 app.use("/graphql", rateLimit({ perSecond: envInt("RATE_LIMIT_PER_SECOND", 20), burst: envInt("RATE_LIMIT_BURST", 60) }));
 const shed = concurrencyLimit(envInt("MAX_INFLIGHT_REQUESTS", 200));
-app.use("/graphql", async (c, next) => {
-  // Long-lived subscription streams are not counted against the in-flight budget.
-  if (c.req.header("accept")?.includes("text/event-stream")) return next();
-  return shed(c, next);
-});
+const shedStreams = streamLimit(envInt("MAX_SSE_STREAMS", 1000));
+app.use("/graphql", (c, next) =>
+  c.req.header("accept")?.includes("text/event-stream") ? shedStreams(c, next) : shed(c, next),
+);
 app.on(["GET", "POST", "OPTIONS"], "/graphql", (c) => {
   const headers = new Headers(c.req.raw.headers);
   headers.set("x-real-ip", clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress));

@@ -66,9 +66,15 @@ const ZONE_COLUMNS = (sql: Sql) => sql`
   id, name, description, latitude, longitude, radius_km as "radiusKm", min_magnitude as "minMagnitude", color,
   created_at as "createdAt", updated_at as "updatedAt"`;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(id: string): boolean {
+  return UUID.test(id);
+}
+
 export function createContext(sql: Sql) {
   const zone = new DataLoader<string, Record<string, unknown> | null>(async (ids) => {
-    const valid = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    const valid = ids.filter(isUuid);
     const rows = valid.length ? await sql`select ${ZONE_COLUMNS(sql)} from ops.watch_zones where id = any(${valid}::uuid[])` : [];
     const map = new Map(rows.map((r) => [r.id as string, r]));
     return ids.map((id) => map.get(id) ?? null);
@@ -97,28 +103,40 @@ export function createContext(sql: Sql) {
 
 type Context = ReturnType<typeof createContext>;
 
-interface ZoneInput {
-  name?: string;
+interface WatchZoneInput {
+  name: string;
   description?: string | null;
-  latitude?: number;
-  longitude?: number;
-  radiusKm?: number;
-  minMagnitude?: number;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  minMagnitude?: number | null;
   color?: string | null;
 }
 
-function validate(input: ZoneInput) {
+type WatchZonePatch = { [K in keyof WatchZoneInput]?: WatchZoneInput[K] | null };
+
+function validate(input: WatchZonePatch) {
   const errors: { field: string; message: string }[] = [];
-  if (input.name !== undefined && (input.name.trim().length < 2 || input.name.length > 80))
+  if (input.name != null && (input.name.trim().length < 2 || input.name.length > 80))
     errors.push({ field: "name", message: "Name must be 2–80 characters" });
-  if (input.latitude !== undefined && Math.abs(input.latitude) > 90) errors.push({ field: "latitude", message: "Latitude must be within ±90°" });
-  if (input.longitude !== undefined && Math.abs(input.longitude) > 180) errors.push({ field: "longitude", message: "Longitude must be within ±180°" });
-  if (input.radiusKm !== undefined && !(input.radiusKm > 0 && input.radiusKm <= 5000))
+  if (input.latitude != null && Math.abs(input.latitude) > 90) errors.push({ field: "latitude", message: "Latitude must be within ±90°" });
+  if (input.longitude != null && Math.abs(input.longitude) > 180) errors.push({ field: "longitude", message: "Longitude must be within ±180°" });
+  if (input.radiusKm != null && !(input.radiusKm > 0 && input.radiusKm <= 5000))
     errors.push({ field: "radiusKm", message: "Radius must be in (0, 5000] km" });
   if (input.minMagnitude != null && !(input.minMagnitude >= 0 && input.minMagnitude <= 10))
     errors.push({ field: "minMagnitude", message: "Magnitude must be in [0, 10]" });
-  if (input.color && !/^#[0-9a-f]{6}$/i.test(input.color)) errors.push({ field: "color", message: "Color must be a hex value like #ff8800" });
+  if (input.color != null && !/^#[0-9a-f]{6}$/i.test(input.color)) errors.push({ field: "color", message: "Color must be a hex value like #ff8800" });
   return errors;
+}
+
+function ingestRunId(body: unknown): number | null {
+  return typeof body === "object" && body !== null && "runId" in body && typeof body.runId === "number" && Number.isSafeInteger(body.runId)
+    ? body.runId
+    : null;
+}
+
+function ingestError(body: unknown): string | null {
+  return typeof body === "object" && body !== null && "error" in body && typeof body.error === "string" ? body.error : null;
 }
 
 function runsWhere(sql: Sql, source?: string, status?: string): Fragment {
@@ -182,7 +200,7 @@ export function createResolvers(channel: PgChannel) {
         ),
     },
     Mutation: {
-      createWatchZone: async (_: unknown, { input }: { input: Required<ZoneInput> }, ctx: Context) => {
+      createWatchZone: async (_: unknown, { input }: { input: WatchZoneInput }, ctx: Context) => {
         const errors = validate(input);
         if (errors.length) return { zone: null, errors };
         const [zone] = await ctx.sql`
@@ -192,13 +210,13 @@ export function createResolvers(channel: PgChannel) {
           returning ${ZONE_COLUMNS(ctx.sql)}`;
         return { zone, errors: [] };
       },
-      updateWatchZone: async (_: unknown, { id, patch }: { id: string; patch: ZoneInput }, ctx: Context) => {
+      updateWatchZone: async (_: unknown, { id, patch }: { id: string; patch: WatchZonePatch }, ctx: Context) => {
         const errors = validate(patch);
         if (errors.length) return { zone: null, errors };
         const existing = await ctx.zone.load(id);
         if (!existing) return { zone: null, errors: [{ field: "id", message: "Watch zone not found" }] };
         const columns: Record<string, unknown> = {};
-        if (patch.name !== undefined && patch.name !== null) columns.name = patch.name.trim();
+        if (patch.name != null) columns.name = patch.name.trim();
         if (patch.description !== undefined) columns.description = patch.description;
         if (patch.latitude != null) columns.latitude = patch.latitude;
         if (patch.longitude != null) columns.longitude = patch.longitude;
@@ -212,7 +230,7 @@ export function createResolvers(channel: PgChannel) {
         return { zone, errors: [] };
       },
       deleteWatchZone: async (_: unknown, { id }: { id: string }, ctx: Context) => {
-        if (!/^[0-9a-f-]{36}$/i.test(id)) return { id, deleted: false };
+        if (!isUuid(id)) return { id, deleted: false };
         const result = await ctx.sql`delete from ops.watch_zones where id = ${id}`;
         return { id, deleted: result.count > 0 };
       },
@@ -221,20 +239,23 @@ export function createResolvers(channel: PgChannel) {
         if (!def) return { accepted: false, runId: null, message: `Unknown source "${source}"` };
         const base = serviceUrls()[def.service];
         if (!base) return { accepted: false, runId: null, message: `No URL configured for service ${def.service}` };
+        let res: Response;
         try {
-          const res = await fetch(`${base}/internal/ingest/${source}`, {
+          res = await fetch(`${base}/internal/ingest/${source}`, {
             method: "POST",
             headers: { "content-type": "application/json", "x-internal-token": INTERNAL_TOKEN() },
             body: JSON.stringify({ mode: mode.toLowerCase(), triggeredBy: "manual" }),
             signal: AbortSignal.timeout(5000),
           });
-          const body = (await res.json()) as { runId?: number; error?: string };
-          if (res.status === 409) return { accepted: false, runId: null, message: "A run for this source is already in progress" };
-          if (!res.ok) return { accepted: false, runId: null, message: body.error ?? `HTTP ${res.status}` };
-          return { accepted: true, runId: String(body.runId), message: `Run #${body.runId} started on ${def.service}` };
         } catch (error) {
-          return { accepted: false, runId: null, message: `Service ${def.service} unreachable: ${(error as Error).message}` };
+          return { accepted: false, runId: null, message: `Service ${def.service} unreachable: ${error instanceof Error ? error.message : String(error)}` };
         }
+        if (res.status === 409) return { accepted: false, runId: null, message: "A run for this source is already in progress" };
+        const body: unknown = await res.json().catch(() => null);
+        if (!res.ok) return { accepted: false, runId: null, message: ingestError(body) ?? `HTTP ${res.status}` };
+        const runId = ingestRunId(body);
+        if (runId === null) return { accepted: false, runId: null, message: `Service ${def.service} returned HTTP ${res.status} without a run id` };
+        return { accepted: true, runId: String(runId), message: `Run #${runId} started on ${def.service}` };
       },
     },
     Subscription: {

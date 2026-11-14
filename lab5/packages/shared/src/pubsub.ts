@@ -8,7 +8,7 @@ import type { Logger } from "./logger.ts";
  */
 export class PgChannel {
   private listeners = new Set<(payload: string) => void>();
-  private started = false;
+  private listening: Promise<unknown> | undefined;
 
   constructor(
     private readonly sql: Sql,
@@ -16,14 +16,18 @@ export class PgChannel {
     private readonly log: Logger,
   ) {}
 
-  private async ensureListening() {
-    if (this.started) return;
-    this.started = true;
-    await this.sql.listen(
-      this.channel,
-      (payload) => this.listeners.forEach((fn) => fn(payload)),
-      () => this.log.info({ channel: this.channel }, "listening for notifications"),
-    );
+  private ensureListening() {
+    this.listening ??= this.sql
+      .listen(
+        this.channel,
+        (payload) => this.listeners.forEach((fn) => fn(payload)),
+        () => this.log.info({ channel: this.channel }, "listening for notifications"),
+      )
+      .catch((error: unknown) => {
+        this.listening = undefined;
+        throw error;
+      });
+    return this.listening;
   }
 
   subscribe(): AsyncIterable<string> {

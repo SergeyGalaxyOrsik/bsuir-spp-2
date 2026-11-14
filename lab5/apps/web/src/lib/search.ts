@@ -15,8 +15,21 @@ export const strList = (v: unknown): string[] | undefined => {
   return clean.length ? clean : undefined
 }
 
+export const isOneOf = <T extends string>(v: unknown, allowed: readonly T[]): v is T => allowed.some((a) => a === v)
+
 export function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallback: T): T {
-  return allowed.includes(v as T) ? (v as T) : fallback
+  return isOneOf(v, allowed) ? v : fallback
+}
+
+/** Own keys only: `"toString" in obj` is true for every object literal. */
+const isKeyOf = <T extends object>(v: unknown, obj: T): v is keyof T & string =>
+  typeof v === "string" && Object.hasOwn(obj, v)
+
+export const keyOf = <T extends object>(v: unknown, obj: T): (keyof T & string) | undefined => (isKeyOf(v, obj) ? v : undefined)
+
+export const listOf = <T extends string>(v: unknown, allowed: readonly T[]): T[] | undefined => {
+  const clean = strList(v)?.filter((x) => isOneOf(x, allowed))
+  return clean?.length ? clean : undefined
 }
 
 export const pageSize = (v: unknown, fallback = 25) => {

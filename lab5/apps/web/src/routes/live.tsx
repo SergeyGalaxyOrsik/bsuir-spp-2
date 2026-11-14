@@ -263,9 +263,9 @@ function LivePage() {
 
   useSubscription(QuakeFeed, {}, (data) => {
     const q = toQuake(data.earthquakeDetected)
-    if (q.mag < minMag) return
-    setLiveQuakes((prev) => new Map(prev).set(q.id, q))
-    if (mode === "live") pulse(q)
+    const horizon = Date.now() - WINDOWS[windowKey].span
+    setLiveQuakes((prev) => new Map([...prev].filter(([, p]) => p.t >= horizon)).set(q.id, q))
+    if (mode === "live" && q.mag >= minMag) pulse(q)
   }, mounted)
   useSubscription(HazardFeed, {}, (data) => {
     const h = toHazard(data.naturalEventUpdated, snapshot.data?.from ?? Date.now())
@@ -274,10 +274,10 @@ function LivePage() {
 
   const quakes = useMemo(() => {
     const base = snapshot.data?.quakes ?? []
-    if (!liveQuakes.size) return base
     const ids = new Set(base.map((q) => q.id))
-    return [...base, ...[...liveQuakes.values()].filter((q) => !ids.has(q.id))].sort((a, b) => a.t - b.t)
-  }, [snapshot.data, liveQuakes])
+    const live = [...liveQuakes.values()].filter((q) => q.mag >= minMag && !ids.has(q.id))
+    return live.length ? [...base, ...live].sort((a, b) => a.t - b.t) : base
+  }, [snapshot.data, liveQuakes, minMag])
   const hazards = useMemo(() => {
     const merged = new Map((snapshot.data?.hazards ?? []).map((h) => [h.id, h]))
     for (const [id, h] of liveHazards) merged.set(id, h)
