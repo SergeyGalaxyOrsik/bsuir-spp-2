@@ -39,7 +39,7 @@ export function useSubgraphCircuitBreaker(opts: { threshold: number; cooldownMs:
     onFetch({ url, executionRequest, fetchFn, setFetchFn }) {
       // Only subgraph calls made while executing an operation (not supergraph polling etc.).
       if (!executionRequest) return;
-      const name = new URL(url).hostname;
+      const name = executionRequest.subgraphName ?? new URL(url).host;
       const breaker = breakerFor(name);
       setFetchFn((input, init, context, info) =>
         breaker
