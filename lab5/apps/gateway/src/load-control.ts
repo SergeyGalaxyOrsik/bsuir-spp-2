@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { Counter, Gauge } from "prom-client";
 import { INTERNAL_TOKEN, registry } from "@geopulse/shared";
 
@@ -14,6 +14,17 @@ const inflightGauge = new Gauge({
   help: "GraphQL requests currently being processed",
   registers: [registry],
 });
+
+const openStreamsGauge = new Gauge({
+  name: "geopulse_gateway_open_sse_streams",
+  help: "Subscription (SSE) streams currently open",
+  registers: [registry],
+});
+
+const overloaded = (c: Context) => {
+  c.header("retry-after", "1");
+  return c.json({ errors: [{ message: "Server is overloaded, retry shortly", extensions: { code: "OVERLOADED" } }] }, 503);
+};
 
 /**
  * The rate-limit key. `x-real-ip` is honoured only from our own web proxy, which proves itself
@@ -63,8 +74,7 @@ export function concurrencyLimit(max: number): MiddlewareHandler {
   return async (c, next) => {
     if (inflight >= max) {
       rejected.inc({ reason: "overload" });
-      c.header("retry-after", "1");
-      return c.json({ errors: [{ message: "Server is overloaded, retry shortly", extensions: { code: "OVERLOADED" } }] }, 503);
+      return overloaded(c);
     }
     inflight++;
     inflightGauge.set(inflight);
@@ -74,5 +84,63 @@ export function concurrencyLimit(max: number): MiddlewareHandler {
       inflight--;
       inflightGauge.set(inflight);
     }
+  };
+}
+
+/**
+ * Like `concurrencyLimit`, but a slot is held until the response body finishes or the client
+ * disconnects, not just until the handler returns, so long-lived SSE streams are counted.
+ */
+export function streamLimit(max: number): MiddlewareHandler {
+  let open = 0;
+  return async (c, next) => {
+    if (open >= max) {
+      rejected.inc({ reason: "stream_overload" });
+      return overloaded(c);
+    }
+    open++;
+    openStreamsGauge.set(open);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      open--;
+      openStreamsGauge.set(open);
+    };
+    try {
+      await next();
+    } catch (error) {
+      release();
+      throw error;
+    }
+    const body = c.res.body;
+    if (!body) {
+      release();
+      return;
+    }
+    const reader = body.getReader();
+    c.res = new Response(
+      new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          try {
+            const { done, value } = await reader.read();
+            if (done) {
+              release();
+              controller.close();
+            } else {
+              controller.enqueue(value);
+            }
+          } catch (error) {
+            release();
+            controller.error(error);
+          }
+        },
+        cancel(reason) {
+          release();
+          return reader.cancel(reason);
+        },
+      }),
+      c.res,
+    );
   };
 }
