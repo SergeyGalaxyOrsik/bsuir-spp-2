@@ -82,7 +82,7 @@ services:
   seismic:
     <<: *service
     build: { context: ., dockerfile: infra/Dockerfile.service, args: { SERVICE: services/seismic } }
-    environment: { <<: *service-env, PORT: "4002", OTEL_SERVICE_NAME: seismic-subgraph }
+    environment: { <<: *service-env, PORT: "4002", OTEL_SERVICE_NAME: seismic-subgraph, SEISMIC_BACKFILL_MONTHS: "${SEISMIC_BACKFILL_MONTHS:-24}" }
     # Two replicas behind Docker DNS: the gateway load-balances, advisory locks elect one ingester.
     deploy:
       replicas: 2
@@ -90,7 +90,7 @@ services:
   hazards:
     <<: *service
     build: { context: ., dockerfile: infra/Dockerfile.service, args: { SERVICE: services/hazards } }
-    environment: { <<: *service-env, PORT: "4003", OTEL_SERVICE_NAME: hazards-subgraph }
+    environment: { <<: *service-env, PORT: "4003", OTEL_SERVICE_NAME: hazards-subgraph, HAZARDS_FROM_YEAR: "${HAZARDS_FROM_YEAR:-2019}" }
 
   ops:
     <<: *service

@@ -332,7 +332,7 @@ function CountryPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <WorldMap
+          <WorldMap fit
             points={[
               ...(c.recentEarthquakes ?? []).map((q) => ({
                 id: q.id,

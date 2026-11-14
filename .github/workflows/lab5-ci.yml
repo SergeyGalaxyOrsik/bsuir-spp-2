@@ -1,0 +1,68 @@
+name: lab5-ci
+
+on:
+  push:
+    paths:
+      - "lab5/**"
+      - ".github/workflows/lab5-ci.yml"
+  pull_request:
+    paths:
+      - "lab5/**"
+      - ".github/workflows/lab5-ci.yml"
+
+concurrency:
+  group: lab5-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: lab5
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - name: Supergraph composes and generated types are up to date
+        run: |
+          bun run compose
+          bun run codegen
+          git diff --exit-code -- apps/gateway/supergraph.graphql apps/web/src/graphql
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run --cwd apps/web build
+
+  stack:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      SEISMIC_BACKFILL_MONTHS: "2"
+      HAZARDS_FROM_YEAR: "2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: docker compose up -d --build --wait
+      - name: Wait for collectors
+        run: |
+          for attempt in $(seq 1 60); do
+            n=$(curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ totalRecords }"}' | sed -E 's/.*"totalRecords":([0-9]+).*/\1/' || echo 0)
+            echo "records: $n"
+            [ "${n:-0}" -gt 10000 ] 2>/dev/null && exit 0
+            sleep 5
+          done
+          exit 1
+      - run: bun install --frozen-lockfile
+      - run: bun test apps/gateway/test
+      - run: curl -fsS localhost:3100/ -o /dev/null
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail 200

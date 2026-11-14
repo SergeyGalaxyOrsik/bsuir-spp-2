@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "tsx watch --import @geopulse/shared/telemetry src/index.ts",
     "start": "tsx --import @geopulse/shared/telemetry src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@geopulse/shared": "workspace:*",

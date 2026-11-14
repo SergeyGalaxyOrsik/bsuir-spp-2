@@ -1,4 +1,4 @@
-import { geoEqualEarth, geoGraticule10, geoPath } from "d3-geo"
+import { geoCircle, geoEqualEarth, geoGraticule10, geoPath } from "d3-geo"
 import { feature } from "topojson-client"
 import type { GeometryCollection, Topology } from "topojson-specification"
 import landTopo from "world-atlas/land-110m.json"
@@ -40,38 +40,48 @@ export function WorldMap({
   circles = [],
   className,
   onMapClick,
+  fit = false,
 }: {
   points?: MapPoint[]
   circles?: MapCircle[]
   className?: string
+  /** Zoom to the data instead of showing the whole globe. */
+  fit?: boolean
   onMapClick?: (coords: { latitude: number; longitude: number }) => void
 }) {
   const [hover, setHover] = useState<MapPoint | null>(null)
   const { projection, landPath, graticule } = useMemo(() => {
-    const projection = geoEqualEarth().fitSize([WIDTH, HEIGHT], { type: "Sphere" })
+    const projection = geoEqualEarth()
+    const coords = [...points.map((p) => [p.longitude, p.latitude]), ...circles.map((c) => [c.longitude, c.latitude])]
+    if (fit && coords.length > 0) {
+      const lons = coords.map((c) => c[0]!)
+      const lats = coords.map((c) => c[1]!)
+      const pad = 6
+      const [w, e] = [Math.max(-180, Math.min(...lons) - pad), Math.min(180, Math.max(...lons) + pad)]
+      const [s2, n] = [Math.max(-85, Math.min(...lats) - pad), Math.min(85, Math.max(...lats) + pad)]
+      projection.fitExtent(
+        [
+          [20, 20],
+          [WIDTH - 20, HEIGHT - 20],
+        ],
+        { type: "MultiPoint", coordinates: [[w, s2], [e, s2], [e, n], [w, n]] },
+      )
+    } else {
+      projection.fitSize([WIDTH, HEIGHT], { type: "Sphere" })
+    }
     const path = geoPath(projection)
     return { projection, landPath: path(land) ?? "", graticule: path(geoGraticule10()) ?? "" }
-  }, [])
+    // Refit only when the set of locations changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fit, fit ? JSON.stringify(points.map((p) => [p.longitude, p.latitude])) : ""])
 
   const circlePaths = useMemo(() => {
     const path = geoPath(projection)
-    return circles.map((c) => {
-      // Geodesic circle as a polygon so it is distorted correctly by the projection.
-      const steps = 64
-      const R = 6371
-      const lat1 = (c.latitude * Math.PI) / 180
-      const lon1 = (c.longitude * Math.PI) / 180
-      const d = c.radiusKm / R
-      const coords: [number, number][] = []
-      for (let i = 0; i <= steps; i++) {
-        const brng = (2 * Math.PI * i) / steps
-        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng))
-        const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2))
-        coords.push([(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI])
-      }
-      coords.reverse()
-      return { ...c, d: path({ type: "Polygon", coordinates: [coords] }) ?? "" }
-    })
+    // geoCircle yields a correctly wound geodesic polygon (radius in degrees of arc).
+    return circles.map((c) => ({
+      ...c,
+      d: path(geoCircle().center([c.longitude, c.latitude]).radius(c.radiusKm / 111.195).precision(2)()) ?? "",
+    }))
   }, [circles, projection])
 
   return (
