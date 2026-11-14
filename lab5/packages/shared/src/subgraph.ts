@@ -7,7 +7,7 @@ import { parse } from "graphql";
 import { createYoga, type Plugin, type YogaInitialContext } from "graphql-yoga";
 import { Hono } from "hono";
 import type { Sql } from "./db.ts";
-import { INTERNAL_TOKEN } from "./env.ts";
+import { envInt, INTERNAL_TOKEN } from "./env.ts";
 import type { Logger } from "./logger.ts";
 import { registry } from "./metrics.ts";
 
@@ -59,6 +59,12 @@ export function startSubgraph<TContext extends object>(opts: SubgraphOptions<TCo
 
   const app = new Hono();
   let shuttingDown = false;
+  // While draining, tell keep-alive clients (the gateway) not to reuse the socket, so their next
+  // request opens a fresh connection to a live replica instead of hanging on a dying pod.
+  app.use("*", async (c, next) => {
+    await next();
+    if (shuttingDown) c.header("connection", "close");
+  });
 
   app.get("/health", (c) => c.json({ status: "ok", service: name }));
   app.get("/ready", async (c) => {
@@ -91,7 +97,14 @@ export function startSubgraph<TContext extends object>(opts: SubgraphOptions<TCo
     shuttingDown = true;
     log.info({ signal }, "shutting down");
     await opts.onShutdown?.();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    const http = server as unknown as { closeIdleConnections?: () => void; closeAllConnections?: () => void };
+    const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+    http.closeIdleConnections?.();
+    // In-flight requests get a short grace period; long-lived SSE streams are cut after it
+    // (clients reconnect to another replica).
+    const force = setTimeout(() => http.closeAllConnections?.(), envInt("SHUTDOWN_GRACE_MS", 5_000));
+    await closed;
+    clearTimeout(force);
     await sql.end({ timeout: 5 });
     process.exit(0);
   };

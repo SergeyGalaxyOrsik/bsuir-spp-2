@@ -126,8 +126,10 @@ function runsConnection(ctx: Context, args: { source?: string; status?: string; 
     from: ctx.sql`ops.ingest_runs`,
     where: runsWhere(ctx.sql, args.source, args.status),
     select: RUN_COLUMNS(ctx.sql),
-    sort: { expr: "id", cast: "int8" },
-    idColumn: "id",
+    // Qualified on purpose: RUN_COLUMNS outputs `id::text as id`, and a bare `order by id` would
+    // pick that text alias and sort "9" after "71".
+    sort: { expr: "ingest_runs.id", cast: "int8" },
+    idColumn: "ingest_runs.id",
     descending: true,
     args,
   });

@@ -152,6 +152,44 @@ docker stop geopulse-hazards-1    # страница страны отдаётс
 docker start geopulse-hazards-1
 ```
 
+## Kubernetes (локально, OrbStack / Docker Desktop)
+
+```bash
+docker compose stop                 # освободить ресурсы, данные compose сохраняются
+./infra/k8s/deploy.sh               # собрать образы, развернуть, дождаться rollout
+./infra/k8s/resilience-demo.sh      # учения по отказам под фоновой нагрузкой
+./infra/k8s/deploy.sh --delete      # удалить namespace вместе с томом БД
+```
+
+| Что | URL |
+| --- | --- |
+| Веб-приложение (`/live` — глобус) | http://localhost:8080 |
+| GraphQL | http://localhost:8040/graphql |
+| Grafana / Prometheus / Jaeger | http://localhost:8030 · :8090 · :8686 |
+
+Манифесты лежат в `infra/k8s/` (kustomize). Деплойменты сервисов генерирует `generate.py`.
+
+- **Масштабирование.** По 2 реплики каждого сервиса. HPA по CPU, максимум от 2 до 5 подов в зависимости от сервиса (metrics-server в `addons/`). PodDisruptionBudget `minAvailable: 1`.
+- **Обновления без простоя.** Rolling update с `maxUnavailable: 0`. Пробы startup/readiness/liveness. `preStop` выдерживает 5 секунд, затем идёт drain: под отдаёт `Connection: close`, закрывает keep-alive соединения и через 5 секунд обрывает SSE.
+- **Postgres** — StatefulSet с PVC. NetworkPolicy пускает к базе только бэкенд, а к subgraph-ам только шлюз, ops и Prometheus.
+- **Наблюдаемость.** Prometheus находит поды через `kubernetes_sd`, поэтому новые реплики от HPA подхватываются автоматически.
+- **Защита шлюза от сбоев subgraph-ов:**
+  - circuit breaker на каждый subgraph: после 3 ошибок шлюз 5 секунд сразу отвечает частичными данными;
+  - таймаут вызова 3 секунды, на подписки он не действует;
+  - один быстрый повтор;
+  - супер-граф обновляется в фоне по схеме stale-while-revalidate.
+
+Результат `resilience-demo.sh` (запрос через geo, seismic и hazards примерно 5 раз в секунду):
+
+| Сценарий | OK | Частичный ответ | Ошибка |
+| --- | --- | --- | --- |
+| Удаление пода seismic | 84 | 0 | 0 |
+| Rolling restart шлюза | 56 | 0 | 0 |
+| hazards полностью выключен | 21 | 14 | 1 |
+| hazards возвращается | 29 | 19 | 0 |
+
+Нагрузочные тесты (k6) описаны в `load-tests/README.md`, результаты — в `load-tests/RESULTS.md`. Для кластера: `INTERNAL_TOKEN=geopulse-k8s-internal-token BASE_URL=http://localhost:8040/graphql WEB_URL=http://localhost:8080 RAISE_LIMITS=0 ./load-tests/run.sh smoke`.
+
 ## Структура
 
 ```

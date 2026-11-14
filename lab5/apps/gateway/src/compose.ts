@@ -48,7 +48,24 @@ export async function compose(subgraphs: SubgraphConfig[]) {
  */
 export function supergraphLoader(subgraphs: SubgraphConfig[], log: Logger) {
   let lastGood: string | undefined;
+  let refreshing: Promise<void> | undefined;
+  // Stale-while-revalidate: once a supergraph is known, a poll answers with it immediately and
+  // recomposes in the background (picked up on the next poll). Otherwise a poll that lands while
+  // a subgraph is down would hold incoming requests for the whole retry cycle of `compose`.
+  const refresh = () =>
+    (refreshing ??= compose(subgraphs)
+      .then(({ supergraphSdl }) => {
+        if (supergraphSdl !== lastGood) log.info({ subgraphs: subgraphs.map((s) => s.name) }, "supergraph recomposed");
+        lastGood = supergraphSdl;
+      })
+      .catch((error) => log.warn({ err: (error as Error).message }, "recomposition failed, keeping previous supergraph"))
+      .finally(() => (refreshing = undefined)));
+
   return async (): Promise<string> => {
+    if (lastGood) {
+      void refresh();
+      return lastGood;
+    }
     for (let attempt = 1; ; attempt++) {
       try {
         const { supergraphSdl } = await compose(subgraphs);
@@ -56,10 +73,6 @@ export function supergraphLoader(subgraphs: SubgraphConfig[], log: Logger) {
         lastGood = supergraphSdl;
         return supergraphSdl;
       } catch (error) {
-        if (lastGood) {
-          log.warn({ err: (error as Error).message }, "recomposition failed, keeping previous supergraph");
-          return lastGood;
-        }
         // A subgraph being down at boot must not keep the whole API offline: fall back to the
         // supergraph composed at build time (`bun run compose`) and keep polling for a live one.
         const fallback = new URL("../supergraph.graphql", import.meta.url);

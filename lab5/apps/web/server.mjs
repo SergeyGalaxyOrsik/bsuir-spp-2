@@ -19,13 +19,17 @@ app.all("/graphql", async (c) => {
   if (process.env.INTERNAL_TOKEN) headers.set("x-internal-token", process.env.INTERNAL_TOKEN)
   const url = new URL(GATEWAY)
   url.search = new URL(c.req.url).search
-  const upstream = await fetch(url, {
-    method: c.req.method,
-    headers,
-    body: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : c.req.raw.body,
-    duplex: "half",
-    signal: c.req.raw.signal,
-  }).catch(() => null)
+  // GraphQL bodies are small: buffer them so a request can be replayed once if the pooled
+  // connection turns out to point at a gateway pod that has just gone away.
+  const body = c.req.method === "GET" || c.req.method === "HEAD" ? undefined : await c.req.arrayBuffer()
+  const send = () => fetch(url, { method: c.req.method, headers, body, signal: c.req.raw.signal })
+  let upstream
+  for (let attempt = 1; !upstream && attempt <= 2; attempt++) {
+    upstream = await send().catch((error) => {
+      if (!c.req.raw.signal.aborted) console.warn(`gateway request failed (attempt ${attempt}): ${error.cause?.code ?? error.message}`)
+      return null
+    })
+  }
   if (!upstream) return c.json({ errors: [{ message: "Gateway unavailable", extensions: { code: "GATEWAY_UNAVAILABLE" } }] }, 502)
   const out = new Headers(upstream.headers)
   out.delete("content-encoding")

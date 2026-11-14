@@ -9,7 +9,8 @@ CONTEXT="${KUBE_CONTEXT:-orbstack}"
 K="kubectl --context $CONTEXT -n geopulse"
 URL="${GATEWAY_URL:-http://localhost:8040/graphql}"
 LOG="$(mktemp -t geopulse-probe)"
-QUERY='{"query":"{ country(code:\"JPN\") { name seismicStats { count } hazardStats { count } } earthquakes(first: 3) { nodes { id } } }"}'
+# A unique alias per request keeps the gateway response cache out of the measurement.
+query() { echo "{\"query\":\"{ n$RANDOM$RANDOM: __typename country(code:\\\"JPN\\\") { name seismicStats { count } hazardStats { count } } earthquakes(first: 3) { nodes { id } } }\"}"; }
 
 phase() { echo "$1" >"$LOG.phase"; echo; echo "=== $1"; }
 current() { cat "$LOG.phase" 2>/dev/null || echo init; }
@@ -17,7 +18,7 @@ current() { cat "$LOG.phase" 2>/dev/null || echo init; }
 prober() { while true; do probe_once; done; }
 probe_once() {
   local p; p=$(current)
-  out=$(curl -s -m 3 -o - -w ' HTTP%{http_code}' "$URL" -H 'content-type: application/json' -d "$QUERY" 2>/dev/null)
+  out=$(curl -s -m 5 -o - -w ' HTTP%{http_code}' "$URL" -H 'content-type: application/json' -d "$(query)" 2>/dev/null)
   code=${out##* HTTP}
   if [[ "$code" != "200" ]]; then echo "$p FAIL" >>"$LOG"
   elif [[ "$out" == *'"errors"'* ]]; then echo "$p PARTIAL" >>"$LOG"

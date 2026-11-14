@@ -13,6 +13,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { subgraphsFromEnv, supergraphLoader } from "./compose.ts";
+import { useSubgraphCircuitBreaker } from "./subgraph-breaker.ts";
 import { clientIp, concurrencyLimit, rateLimit } from "./load-control.ts";
 
 const log = createLogger("gateway");
@@ -35,8 +36,13 @@ const gateway = createGatewayRuntime({
   requestId: true,
   contentEncoding: true,
   // Fault tolerance towards subgraphs.
-  upstreamTimeout: envInt("UPSTREAM_TIMEOUT_MS", 10_000),
-  upstreamRetry: { maxRetries: 2, retryDelay: 150, retryDelayFactor: 2 },
+  // Per subgraph call. Subscriptions are long-lived SSE streams and must not be cut by it
+  // (otherwise clients silently reconnect every N seconds and miss events in between).
+  upstreamTimeout: ({ executionRequest }) =>
+    executionRequest?.operationType === "subscription" ? undefined : envInt("UPSTREAM_TIMEOUT_MS", 10_000),
+  // One quick retry: enough to land on another replica when a pod dies mid-request, while a
+  // subgraph that is down entirely costs the response ~0.2 s instead of seconds of backoff.
+  upstreamRetry: { maxRetries: envInt("UPSTREAM_RETRIES", 1), retryDelay: 100, retryDelayFactor: 1 },
   requestDeadline: envInt("REQUEST_DEADLINE_MS", 20_000),
   inboundInflightRequestDeduplication: true,
   // Query cost analysis based on @cost/@listSize directives in the subgraphs.
@@ -66,6 +72,7 @@ const gateway = createGatewayRuntime({
   },
   cors: { origin: allowedOrigins, credentials: false },
   plugins: (ctx) => [
+    useSubgraphCircuitBreaker({ threshold: envInt("SUBGRAPH_BREAKER_THRESHOLD", 3), cooldownMs: envInt("SUBGRAPH_BREAKER_COOLDOWN_MS", 5_000) }),
     maxDepthPlugin({ n: envInt("MAX_QUERY_DEPTH", 10), flattenFragments: true, ignoreIntrospection: true }),
     maxAliasesPlugin({ n: 15, allowList: [] }),
     maxTokensPlugin({ n: 3000 }),
@@ -101,9 +108,17 @@ const gateway = createGatewayRuntime({
 });
 
 const app = new Hono<{ Bindings: { incoming: { socket: { remoteAddress?: string } } } }>();
+let stopping = false;
+
+// While draining, ask keep-alive clients (the web proxy) not to reuse their socket to this pod.
+app.use("*", async (c, next) => {
+  await next();
+  if (stopping) c.header("connection", "close");
+});
 
 app.get("/health", (c) => c.json({ status: "ok", service: "gateway" }));
 app.get("/ready", async (c) => {
+  if (stopping) return c.json({ status: "draining" }, 503);
   const res = await gateway.fetch(new Request("http://gateway/readiness"));
   return c.json({ status: res.ok ? "ready" : "not ready" }, res.ok ? 200 : 503);
 });
@@ -134,12 +149,18 @@ const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
   void Promise.resolve(gateway.fetch(new Request(`http://localhost:${port}/graphql?query=%7B__typename%7D`))).catch(() => undefined);
 });
 
-let stopping = false;
 const shutdown = async () => {
   if (stopping) return;
   stopping = true;
   log.info("gateway shutting down");
-  server.close();
+  const http = server as unknown as { closeIdleConnections?: () => void; closeAllConnections?: () => void };
+  const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+  http.closeIdleConnections?.();
+  // In-flight requests finish within the grace period; SSE streams are then cut and the
+  // clients reconnect through the Service to another replica.
+  const force = setTimeout(() => http.closeAllConnections?.(), envInt("SHUTDOWN_GRACE_MS", 5_000));
+  await closed;
+  clearTimeout(force);
   await gateway[Symbol.asyncDispose]();
   process.exit(0);
 };
