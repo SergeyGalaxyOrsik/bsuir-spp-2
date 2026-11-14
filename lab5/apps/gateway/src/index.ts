@@ -127,7 +127,11 @@ app.on(["GET", "POST", "OPTIONS"], "/graphql", (c) => {
 });
 
 const port = envInt("PORT", 4000);
-const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => log.info({ port, subgraphs }, "gateway listening"));
+const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
+  log.info({ port, subgraphs }, "gateway listening");
+  // Compose the supergraph eagerly instead of on the first client request.
+  void Promise.resolve(gateway.fetch(new Request(`http://localhost:${port}/graphql?query=%7B__typename%7D`))).catch(() => undefined);
+});
 
 let stopping = false;
 const shutdown = async () => {

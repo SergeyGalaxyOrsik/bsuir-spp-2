@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import type { Logger } from "@geopulse/shared";
 import { composeServices } from "@theguild/federation-composition";
 import { parse } from "graphql";
@@ -58,6 +59,17 @@ export function supergraphLoader(subgraphs: SubgraphConfig[], log: Logger) {
         if (lastGood) {
           log.warn({ err: (error as Error).message }, "recomposition failed, keeping previous supergraph");
           return lastGood;
+        }
+        // A subgraph being down at boot must not keep the whole API offline: fall back to the
+        // supergraph composed at build time (`bun run compose`) and keep polling for a live one.
+        const fallback = new URL("../supergraph.graphql", import.meta.url);
+        if (attempt >= 3 && existsSync(fallback)) {
+          log.warn({ err: (error as Error).message }, "live composition failed, serving bundled supergraph.graphql");
+          // Point the bundled graph at this deployment's subgraph URLs.
+          return subgraphs.reduce(
+            (sdl, sg) => sdl.replace(new RegExp(`(name: "${sg.name}", url: )"[^"]*"`), `$1"${sg.url}"`),
+            readFileSync(fallback, "utf8"),
+          );
         }
         if (attempt >= 60) throw error;
         log.warn({ attempt, err: (error as Error).message }, "subgraphs not ready, retrying composition");
