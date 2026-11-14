@@ -353,8 +353,8 @@ function CountryPage() {
               ...(center ? [{ id: "capital", latitude: center.latitude, longitude: center.longitude, size: 5, color: "#3b82f6", label: `Столица: ${c.capital}` }] : []),
             ]}
           />
-          <IndicatorChart series={c.indicators} />
-          <CountryEarthquakes code={c.code} />
+          <IndicatorChart key={c.code} series={c.indicators} />
+          <CountryEarthquakes key={c.code} code={c.code} />
         </div>
 
         <div className="flex flex-col gap-4">
