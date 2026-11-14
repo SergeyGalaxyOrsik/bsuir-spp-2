@@ -37,6 +37,9 @@ export class GraphQLRequestError extends Error {
   }
 }
 
+/** `fetch` itself rejected: the gateway was unreachable, nothing was answered. */
+export class NetworkError extends Error {}
+
 type Listener = (trace: OperationTrace) => void
 const listeners = new Set<Listener>()
 let traceId = 0
@@ -68,12 +71,18 @@ export async function executeRaw<TResult, TVariables>(
   const query = document.toString()
   const started = performance.now()
   const { kind, name } = operationName(query)
-  const res = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/graphql-response+json, application/json" },
-    body: JSON.stringify({ query, variables }),
-    signal,
-  })
+  let res: Response
+  try {
+    res = await fetch(GRAPHQL_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/graphql-response+json, application/json" },
+      body: JSON.stringify({ query, variables }),
+      signal,
+    })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new NetworkError(error instanceof Error ? error.message : String(error), { cause: error })
+  }
   let body: { data?: TResult | null; errors?: GraphQLErrorShape[]; extensions?: Record<string, unknown> }
   try {
     body = await res.json()
@@ -101,17 +110,21 @@ export async function executeRaw<TResult, TVariables>(
   return { data: body.data, errors, extensions: body.extensions }
 }
 
+/** For callers that cannot render partial data: any GraphQL error fails the whole operation. */
 export async function execute<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables?: TVariables,
 ): Promise<TResult> {
-  return (await executeRaw(document, variables)).data
+  const { data, errors } = await executeRaw(document, variables)
+  if (errors.length > 0) throw new GraphQLRequestError(errors[0].message, errors, 200)
+  return data
 }
 
 export function isRetryable(error: unknown) {
+  if (error instanceof NetworkError) return true
   if (error instanceof GraphQLRequestError) {
     if (error.status === 429 || error.status >= 500) return true
     return error.errors.length === 0
   }
-  return true
+  return false
 }

@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Filter, RotateCcw } from "lucide-react"
 import { useEffect, useState } from "react"
 import { FilterField, PageHeader, SortHeader } from "@/components/app/common"
 import { MagnitudeBadge } from "@/components/app/magnitude"
-import { EmptyState, ErrorState } from "@/components/app/states"
+import { EmptyState, ErrorState, PartialErrors } from "@/components/app/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -16,8 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { graphql } from "@/graphql/gen"
 import type { CountryFilter, CountrySortField } from "@/graphql/gen/graphql"
 import { fmtCompact, fmtFixed, fmtNumber } from "@/lib/format"
-import { execute } from "@/lib/graphql"
-import { bool, compact, num, oneOf, pageSize, str } from "@/lib/search"
+import { execute, executeRaw } from "@/lib/graphql"
+import { bool, compact, keyOf, num, oneOf, pageSize, str } from "@/lib/search"
 
 const CountriesQuery = graphql(`
   query Countries($filter: CountryFilter, $sort: CountrySort, $limit: Int, $offset: Int) {
@@ -123,7 +123,7 @@ const countriesQuery = (search: CountrySearch) => {
   }
   return queryOptions({
     queryKey: ["countries", variables],
-    queryFn: () => execute(CountriesQuery, variables),
+    queryFn: () => executeRaw(CountriesQuery, variables),
     placeholderData: keepPreviousData,
   })
 }
@@ -138,7 +138,7 @@ export const Route = createFileRoute("/countries/")({
     income: str(raw.income),
     landlocked: bool(raw.landlocked),
     un: bool(raw.un),
-    pop: typeof raw.pop === "string" && raw.pop in POPULATION_BANDS ? (raw.pop as keyof typeof POPULATION_BANDS) : undefined,
+    pop: keyOf(raw.pop, POPULATION_BANDS),
     sort: raw.sort ? oneOf(raw.sort, SORT_FIELDS, "POPULATION") : undefined,
     dir: raw.dir ? oneOf(raw.dir, ["ASC", "DESC"] as const, "DESC") : undefined,
     size: raw.size ? pageSize(raw.size) : undefined,
@@ -210,7 +210,8 @@ function OffsetPager({
 function CountriesPage() {
   const search = resolve(Route.useSearch())
   const navigate = useNavigate({ from: Route.fullPath })
-  const { data, error, isFetching, refetch } = useQuery(countriesQuery(search))
+  const { data: result, error, isFetching, refetch } = useQuery(countriesQuery(search))
+  const data = result?.data
   const { data: facets } = useQuery(facetsQuery)
   const [q, setQ] = useState(search.q ?? "")
 
@@ -358,6 +359,7 @@ function CountriesPage() {
         </div>
       </Card>
 
+      <PartialErrors errors={result?.errors ?? []} />
       <Card className="gap-0 overflow-hidden py-0">
         {error && !data ? (
           <div className="p-4">

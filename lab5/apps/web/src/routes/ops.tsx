@@ -4,7 +4,7 @@ import { Activity, Database, ExternalLink, Play, RefreshCw, Server } from "lucid
 import { useState } from "react"
 import { toast } from "sonner"
 import { CursorPager, PageHeader, StatCard } from "@/components/app/common"
-import { ErrorState } from "@/components/app/states"
+import { ErrorState, PartialErrors } from "@/components/app/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,8 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { graphql } from "@/graphql/gen"
 import type { IngestMode, IngestStatus, OpsRunsQuery as OpsRunsData } from "@/graphql/gen/graphql"
 import { fmtDateTime, fmtDuration, fmtNumber, fmtRelative } from "@/lib/format"
-import { execute } from "@/lib/graphql"
-import { cursorStack, oneOf, pageSize } from "@/lib/search"
+import { execute, executeRaw } from "@/lib/graphql"
+import { cursorStack, isOneOf, pageSize } from "@/lib/search"
 import { useSubscription } from "@/lib/subscriptions"
 import { cn } from "@/lib/utils"
 
@@ -117,7 +117,7 @@ const resolve = (s: OpsSearch) => ({ status: s.status, size: s.size ?? 10, curso
 const overviewQuery = () =>
   queryOptions({
     queryKey: ["ops", "overview"],
-    queryFn: () => execute(OpsOverviewQuery),
+    queryFn: () => executeRaw(OpsOverviewQuery),
     refetchInterval: 10_000,
   })
 
@@ -134,7 +134,7 @@ const runsQuery = (s: ReturnType<typeof resolve>) => {
 export const Route = createFileRoute("/ops")({
   validateSearch: (raw: Record<string, unknown>): OpsSearch => {
     const out: OpsSearch = {}
-    if (STATUSES.includes(raw.status as never)) out.status = oneOf(raw.status, STATUSES, "RUNNING")
+    if (isOneOf(raw.status, STATUSES)) out.status = raw.status
     if (raw.size != null) out.size = pageSize(raw.size, 10)
     const cursors = cursorStack(raw.cursors)
     if (cursors.length) out.cursors = cursors
@@ -215,7 +215,7 @@ function OpsPage() {
   const update = (patch: OpsSearch) =>
     navigate({ search: (prev) => ({ ...prev, ...patch, cursors: undefined }), replace: true })
 
-  const data = overview.data
+  const data = overview.data?.data
   const conn = runs.data?.ingestRuns
   const healthy = data?.dataSources.filter((s) => s.health === "HEALTHY").length ?? 0
   const up = data?.systemStatus.filter((s) => s.up).length ?? 0
@@ -232,6 +232,7 @@ function OpsPage() {
         }
       />
 
+      <PartialErrors errors={overview.data?.errors ?? []} />
       {overview.error && !data ? (
         <ErrorState error={overview.error} onRetry={() => overview.refetch()} />
       ) : (

@@ -4,7 +4,7 @@ import { Filter, Map as MapIcon, RotateCcw, Waves } from "lucide-react"
 import { useEffect, useState } from "react"
 import { CursorPager, FilterField, PageHeader, SortHeader } from "@/components/app/common"
 import { AlertBadge, MagnitudeBadge, SEVERITY_LABELS } from "@/components/app/magnitude"
-import { EmptyState, ErrorState } from "@/components/app/states"
+import { EmptyState, ErrorState, PartialErrors } from "@/components/app/states"
 import { WorldMap } from "@/components/app/world-map"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,8 +19,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { graphql } from "@/graphql/gen"
 import type { EarthquakeFilter, EarthquakeSortField, Severity } from "@/graphql/gen/graphql"
 import { fmtDateTime, fmtFixed, fmtNumber, magnitudeColor } from "@/lib/format"
-import { execute } from "@/lib/graphql"
-import { bool, compact, cursorStack, num, oneOf, pageSize, str, strList } from "@/lib/search"
+import { executeRaw } from "@/lib/graphql"
+import { bool, compact, cursorStack, isOneOf, keyOf, listOf, num, oneOf, pageSize, str } from "@/lib/search"
 
 const EarthquakesQuery = graphql(`
   query Earthquakes($filter: EarthquakeFilter, $sort: EarthquakeSort, $first: Int, $after: String) {
@@ -55,7 +55,9 @@ const EarthquakesQuery = graphql(`
 `)
 
 const SORT_FIELDS = ["TIME", "MAGNITUDE", "DEPTH", "SIGNIFICANCE", "FELT"] as const
-const SEVERITIES = ["MINOR", "LIGHT", "MODERATE", "STRONG", "MAJOR", "GREAT"] as const
+const SEVERITIES = ["MICRO", "MINOR", "LIGHT", "MODERATE", "STRONG", "MAJOR", "GREAT"] as const satisfies readonly Severity[]
+const severitiesCoverEnum: [Exclude<Severity, (typeof SEVERITIES)[number]>] extends [never] ? true : false = true
+void severitiesCoverEnum
 const PERIODS = { "7d": 7, "30d": 30, "90d": 90, "1y": 365, all: 0 } as const
 
 export interface EarthquakeSearch {
@@ -64,7 +66,7 @@ export interface EarthquakeSearch {
   maxMag?: number
   maxDepth?: number
   period?: keyof typeof PERIODS
-  severity?: string[]
+  severity?: Severity[]
   country?: string
   tsunami?: boolean
   sort?: (typeof SORT_FIELDS)[number]
@@ -84,7 +86,7 @@ function toFilter(s: EarthquakeSearch): EarthquakeFilter {
     magnitude: s.minMag != null || s.maxMag != null ? { min: s.minMag, max: s.maxMag } : undefined,
     depthKm: s.maxDepth != null ? { max: s.maxDepth } : undefined,
     time: days ? { from: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 13) + ":00:00Z" } : undefined,
-    severities: s.severity as Severity[] | undefined,
+    severities: s.severity,
     countryCodes: s.country ? [s.country.toUpperCase()] : undefined,
     tsunami: s.tsunami,
   })
@@ -100,7 +102,7 @@ const earthquakesQuery = (search: EarthquakeSearch) => {
   }
   return queryOptions({
     queryKey: ["earthquakes", variables],
-    queryFn: () => execute(EarthquakesQuery, variables),
+    queryFn: () => executeRaw(EarthquakesQuery, variables),
     placeholderData: keepPreviousData,
   })
 }
@@ -111,8 +113,8 @@ export const Route = createFileRoute("/earthquakes/")({
     minMag: num(raw.minMag),
     maxMag: num(raw.maxMag),
     maxDepth: num(raw.maxDepth),
-    period: typeof raw.period === "string" && raw.period in PERIODS ? (raw.period as keyof typeof PERIODS) : undefined,
-    severity: strList(raw.severity),
+    period: keyOf(raw.period, PERIODS),
+    severity: listOf(raw.severity, SEVERITIES),
     country: str(raw.country),
     tsunami: bool(raw.tsunami),
     sort: raw.sort ? oneOf(raw.sort, SORT_FIELDS, "TIME") : undefined,
@@ -129,7 +131,8 @@ export const Route = createFileRoute("/earthquakes/")({
 function EarthquakesPage() {
   const search = resolve(Route.useSearch())
   const navigate = useNavigate({ from: Route.fullPath })
-  const { data, error, isFetching, refetch } = useQuery(earthquakesQuery(search))
+  const { data: result, error, isFetching, refetch } = useQuery(earthquakesQuery(search))
+  const data = result?.data
   const [showMap, setShowMap] = useState(true)
   const [q, setQ] = useState(search.q ?? "")
   const [mag, setMag] = useState<[number, number]>([search.minMag ?? 0, search.maxMag ?? 10])
@@ -228,7 +231,10 @@ function EarthquakesPage() {
             variant="outline"
             size="sm"
             value={search.severity ?? []}
-            onValueChange={(v) => update({ severity: v.length ? v : undefined })}
+            onValueChange={(v) => {
+              const severity = v.filter((s) => isOneOf(s, SEVERITIES))
+              update({ severity: severity.length ? severity : undefined })
+            }}
             className="flex-wrap"
           >
             {SEVERITIES.map((s) => (
@@ -270,6 +276,7 @@ function EarthquakesPage() {
         />
       )}
 
+      <PartialErrors errors={result?.errors ?? []} />
       <Card className="gap-0 overflow-hidden py-0">
         {error && !data ? (
           <div className="p-4">

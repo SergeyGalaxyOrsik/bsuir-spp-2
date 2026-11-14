@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { Filter, Map as MapIcon, RotateCcw } from "lucide-react"
 import { useEffect, useState } from "react"
 import { CursorPager, FilterField, PageHeader, SortHeader } from "@/components/app/common"
-import { EmptyState, ErrorState } from "@/components/app/states"
+import { EmptyState, ErrorState, PartialErrors } from "@/components/app/states"
 import { categoryColor } from "@/components/app/hazard"
 import { WorldMap } from "@/components/app/world-map"
 import { Badge } from "@/components/ui/badge"
@@ -17,8 +17,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { graphql } from "@/graphql/gen"
 import type { EventStatus, NaturalEventFilter, NaturalEventSortField } from "@/graphql/gen/graphql"
 import { fmtDate, fmtFixed, fmtNumber } from "@/lib/format"
-import { execute } from "@/lib/graphql"
-import { compact, cursorStack, oneOf, pageSize, str, strList } from "@/lib/search"
+import { execute, executeRaw } from "@/lib/graphql"
+import { compact, cursorStack, keyOf, oneOf, pageSize, str, strList } from "@/lib/search"
 
 const EventsQuery = graphql(`
   query NaturalEvents($filter: NaturalEventFilter, $sort: NaturalEventSort, $first: Int, $after: String) {
@@ -123,7 +123,7 @@ const eventsQuery = (search: EventSearch) => {
   }
   return queryOptions({
     queryKey: ["naturalEvents", variables],
-    queryFn: () => execute(EventsQuery, variables),
+    queryFn: () => executeRaw(EventsQuery, variables),
     placeholderData: keepPreviousData,
   })
 }
@@ -139,7 +139,7 @@ export const Route = createFileRoute("/events/")({
     q: str(raw.q),
     categories: strList(raw.categories),
     status: raw.status === "OPEN" || raw.status === "CLOSED" ? raw.status : undefined,
-    period: typeof raw.period === "string" && raw.period in PERIODS ? (raw.period as keyof typeof PERIODS) : undefined,
+    period: keyOf(raw.period, PERIODS),
     country: str(raw.country),
     sort: raw.sort ? oneOf(raw.sort, SORT_FIELDS, "STARTED_AT") : undefined,
     dir: raw.dir ? oneOf(raw.dir, ["ASC", "DESC"] as const, "DESC") : undefined,
@@ -156,7 +156,8 @@ export const Route = createFileRoute("/events/")({
 function EventsPage() {
   const search = resolve(Route.useSearch())
   const navigate = useNavigate({ from: Route.fullPath })
-  const { data, error, isFetching, refetch } = useQuery(eventsQuery(search))
+  const { data: result, error, isFetching, refetch } = useQuery(eventsQuery(search))
+  const data = result?.data
   const { data: cats } = useQuery(categoriesQuery)
   const [showMap, setShowMap] = useState(true)
   const [q, setQ] = useState(search.q ?? "")
@@ -310,6 +311,7 @@ function EventsPage() {
         />
       )}
 
+      <PartialErrors errors={result?.errors ?? []} />
       <Card className="gap-0 overflow-hidden py-0">
         {error && !data ? (
           <div className="p-4">
