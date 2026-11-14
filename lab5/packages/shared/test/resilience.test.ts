@@ -1,6 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { CircuitBreaker, CircuitOpenError, fetchJson, HttpError, mapLimit } from "../src/http.ts"
+import type { Sql } from "../src/db.ts"
 import { createLogger } from "../src/logger.ts"
+import { PgChannel } from "../src/pubsub.ts"
 import { decodeCursor, encodeCursor, clampFirst } from "../src/pagination.ts"
 
 const log = createLogger("test")
@@ -46,6 +48,19 @@ describe("circuit breaker", () => {
     expect(await breaker.run(async () => 42)).toBe(42)
     expect(breaker.state).toBe("closed")
   })
+
+  test("half-open lets exactly one probe through while it is in flight", async () => {
+    const breaker = new CircuitBreaker("t", 1, 10)
+    await expect(breaker.run(() => Promise.reject(new Error("x")))).rejects.toThrow()
+    await new Promise((r) => setTimeout(r, 20))
+    let release!: () => void
+    const probe = breaker.run(() => new Promise<void>((r) => (release = r)))
+    await expect(breaker.run(async () => 1)).rejects.toBeInstanceOf(CircuitOpenError)
+    release()
+    await probe
+    expect(breaker.state).toBe("closed")
+    expect(await breaker.run(async () => 2)).toBe(2)
+  })
 })
 
 describe("fetchJson", () => {
@@ -88,4 +103,29 @@ test("mapLimit preserves order and bounds concurrency", async () => {
   })
   expect(out).toEqual([10, 20, 30, 40, 50, 60])
   expect(peak).toBe(2)
+})
+
+describe("PgChannel", () => {
+  test("a failed LISTEN is retried by the next subscriber", async () => {
+    let listens = 0
+    let deliver: ((payload: string) => void) | undefined
+    const fakeSql = {
+      async listen(_channel: string, onNotify: (payload: string) => void) {
+        listens++
+        if (listens === 1) throw new Error("connection refused")
+        deliver = onNotify
+      },
+    }
+    const channel = new PgChannel(fakeSql as unknown as Sql, "events", log)
+
+    await expect(channel.subscribe()[Symbol.asyncIterator]().next()).rejects.toThrow("connection refused")
+
+    const subscriber = channel.subscribe()[Symbol.asyncIterator]()
+    const received = subscriber.next()
+    await new Promise((r) => setTimeout(r, 10))
+    expect(listens).toBe(2)
+    deliver?.("hello")
+    expect((await received).value).toBe("hello")
+    await subscriber.return?.()
+  })
 })

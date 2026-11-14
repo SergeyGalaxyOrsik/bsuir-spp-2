@@ -26,6 +26,7 @@ export class CircuitBreaker {
   ) {}
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === "half-open") throw new CircuitOpenError(this.name, this.openedAt + this.cooldownMs);
     if (this.state === "open") {
       if (Date.now() - this.openedAt < this.cooldownMs) {
         throw new CircuitOpenError(this.name, this.openedAt + this.cooldownMs);
