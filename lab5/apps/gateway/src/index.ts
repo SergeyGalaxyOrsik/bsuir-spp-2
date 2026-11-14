@@ -18,7 +18,7 @@ import { clientIp, concurrencyLimit, rateLimit } from "./load-control.ts";
 const log = createLogger("gateway");
 const production = process.env.NODE_ENV === "production";
 const subgraphs = subgraphsFromEnv();
-const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000").split(",");
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3100,http://127.0.0.1:3100").split(",");
 
 const gateway = createGatewayRuntime({
   // Shared KV store for the response cache and per-field rate limits.

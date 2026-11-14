@@ -1,0 +1,823 @@
+schema @link(url: "https://specs.apollo.dev/link/v1.0") @link(url: "https://specs.apollo.dev/join/v0.5", for: EXECUTION) @link(url: "https://specs.apollo.dev/cost/v0.1", import: ["@listSize"]) {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__field(
+  graph: join__Graph
+  requires: join__FieldSet
+  provides: join__FieldSet
+  type: String
+  external: Boolean
+  override: String
+  usedOverridden: Boolean
+  overrideLabel: String
+  contextArguments: [join__ContextArgument!]
+) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+input join__ContextArgument {
+  name: String!
+  type: String!
+  context: String!
+  selection: join__FieldValue!
+}
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(
+  graph: join__Graph!
+  key: join__FieldSet
+  extension: Boolean! = false
+  resolvable: Boolean! = true
+  isInterfaceObject: Boolean! = false
+) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
+
+scalar join__FieldSet
+
+scalar join__FieldValue
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+scalar link__Import
+
+enum link__Purpose {
+  """
+  `SECURITY` features provide metadata necessary to securely resolve fields.
+  """
+  SECURITY
+  """
+  `EXECUTION` features provide metadata necessary for operation execution.
+  """
+  EXECUTION
+}
+
+directive @cost(weight: Int!) on ARGUMENT_DEFINITION | ENUM | FIELD_DEFINITION | INPUT_FIELD_DEFINITION | OBJECT | SCALAR
+
+directive @listSize(
+  assumedSize: Int
+  slicingArguments: [String!]
+  sizedFields: [String!]
+  requireOneSlicingArgument: Boolean = true
+) on FIELD_DEFINITION
+
+enum join__Graph {
+  GEO @join__graph(name: "geo", url: "http://localhost:4001/graphql")
+  HAZARDS @join__graph(name: "hazards", url: "http://localhost:4003/graphql")
+  OPS @join__graph(name: "ops", url: "http://localhost:4004/graphql")
+  SEISMIC @join__graph(name: "seismic", url: "http://localhost:4002/graphql")
+}
+
+scalar DateTime @join__type(graph: GEO) @join__type(graph: HAZARDS) @join__type(graph: OPS) @join__type(graph: SEISMIC)
+
+type GeoPoint @join__type(graph: GEO) {
+  latitude: Float!
+  longitude: Float!
+}
+
+type Indicator @join__type(graph: GEO) {
+  id: IndicatorId!
+  worldBankCode: String!
+  name: String!
+  unit: String
+  description: String
+}
+
+type IndicatorPoint @join__type(graph: GEO) {
+  year: Int!
+  value: Float
+}
+
+type IndicatorSeries @join__type(graph: GEO) {
+  indicator: Indicator!
+  points: [IndicatorPoint!]! @listSize(assumedSize: 30)
+  latest: IndicatorPoint
+  """
+  Relative change between the first and the last non-null point, in percent.
+  """
+  changePct: Float
+}
+
+type IndicatorRank @join__type(graph: GEO) {
+  rank: Int!
+  country: Country!
+  year: Int!
+  value: Float!
+}
+
+type Weather @join__type(graph: GEO) {
+  temperatureC: Float
+  apparentTemperatureC: Float
+  humidity: Float
+  windSpeedKmh: Float
+  windDirection: Float
+  precipitationMm: Float
+  weatherCode: Int
+  description: String!
+  isDay: Boolean
+  observedAt: DateTime!
+  location: GeoPoint!
+}
+
+type Language @join__type(graph: GEO, key: "code") {
+  code: ID!
+  name: String!
+  countryCount: Int!
+  countries: [Country!]! @listSize(assumedSize: 30)
+}
+
+type Currency @join__type(graph: GEO, key: "code") {
+  code: ID!
+  name: String!
+  symbol: String
+  countries: [Country!]! @listSize(assumedSize: 30)
+}
+
+type Region @join__type(graph: GEO) {
+  name: String!
+  countryCount: Int!
+  population: Float
+  areaKm2: Float
+  subregions: [String!]!
+  countries(sort: CountrySort): [Country!]! @listSize(assumedSize: 60)
+}
+
+"""
+Fields contributed to entities owned by other subgraphs are nullable: if this subgraph is down,
+the rest of the response still resolves (partial data + error) instead of nulling the parent.
+"""
+type Country @join__type(graph: GEO, key: "code") @join__type(graph: HAZARDS, key: "code") @join__type(graph: SEISMIC, key: "code") {
+  """
+  ISO 3166-1 alpha-3 code.
+  """
+  code: ID!
+  isoAlpha2: String! @join__field(graph: GEO)
+  numericCode: String @join__field(graph: GEO)
+  name: String! @join__field(graph: GEO)
+  officialName: String! @join__field(graph: GEO)
+  """
+  Name in another language, ISO 639-3 key from the source dataset (e.g. rus, deu, fra).
+  """
+  localizedName(lang: String! = "rus"): String @join__field(graph: GEO)
+  capital: String @join__field(graph: GEO)
+  capitalLocation: GeoPoint @join__field(graph: GEO)
+  region: String! @join__field(graph: GEO)
+  subregion: String @join__field(graph: GEO)
+  location: GeoPoint @join__field(graph: GEO)
+  areaKm2: Float @join__field(graph: GEO)
+  landlocked: Boolean! @join__field(graph: GEO)
+  independent: Boolean @join__field(graph: GEO)
+  unMember: Boolean! @join__field(graph: GEO)
+  flag: String @join__field(graph: GEO)
+  flagUrl: String @join__field(graph: GEO)
+  topLevelDomains: [String!]! @join__field(graph: GEO)
+  callingCodes: [String!]! @join__field(graph: GEO)
+  incomeLevel: String @join__field(graph: GEO)
+  population: Float @join__field(graph: GEO)
+  gdpPerCapita: Float @join__field(graph: GEO)
+  lifeExpectancy: Float @join__field(graph: GEO)
+  """
+  People per km².
+  """
+  density: Float @join__field(graph: GEO)
+  neighbors: [Country!]! @join__field(graph: GEO) @listSize(assumedSize: 8)
+  languages: [Language!]! @join__field(graph: GEO)
+  currencies: [Currency!]! @join__field(graph: GEO)
+  indicator(id: IndicatorId!, fromYear: Int, toYear: Int): IndicatorSeries @join__field(graph: GEO)
+  indicators(ids: [IndicatorId!], fromYear: Int, toYear: Int): [IndicatorSeries!]! @join__field(graph: GEO) @listSize(assumedSize: 8)
+  weather: Weather @join__field(graph: GEO)
+  naturalEvents(
+    filter: NaturalEventFilter
+    sort: NaturalEventSort
+    first: Int = 25
+    after: String
+  ): NaturalEventConnection @join__field(graph: HAZARDS) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+  hazardStats(filter: NaturalEventFilter): HazardStats @join__field(graph: HAZARDS)
+  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection @join__field(graph: SEISMIC) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+  """
+  Latest events for this country — batched across countries in one SQL query.
+  """
+  recentEarthquakes(first: Int = 5, minMagnitude: Float): [Earthquake!] @join__field(graph: SEISMIC) @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  seismicStats(filter: EarthquakeFilter): EarthquakeStats @join__field(graph: SEISMIC)
+}
+
+"""
+Offset-paginated page (countries are a small, bounded set).
+"""
+type CountryPage @join__type(graph: GEO) {
+  items: [Country!]!
+  total: Int!
+  limit: Int!
+  offset: Int!
+  hasMore: Boolean!
+}
+
+type Query @join__type(graph: GEO) @join__type(graph: HAZARDS) @join__type(graph: OPS) @join__type(graph: SEISMIC) {
+  country(code: ID!): Country @join__field(graph: GEO)
+  countries(filter: CountryFilter, sort: CountrySort, limit: Int = 20, offset: Int = 0): CountryPage! @join__field(graph: GEO) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["limit"]
+    sizedFields: ["items"]
+  )
+  regions: [Region!]! @join__field(graph: GEO) @listSize(assumedSize: 6)
+  languages(search: String, limit: Int = 50): [Language!]! @join__field(graph: GEO) @listSize(requireOneSlicingArgument: false, slicingArguments: ["limit"])
+  currencies(search: String, limit: Int = 50): [Currency!]! @join__field(graph: GEO) @listSize(requireOneSlicingArgument: false, slicingArguments: ["limit"])
+  indicators: [Indicator!]! @join__field(graph: GEO)
+  indicatorRanking(
+    id: IndicatorId!
+    year: Int
+    limit: Int = 10
+    direction: SortDirection = DESC
+    region: String
+  ): [IndicatorRank!]! @join__field(graph: GEO) @listSize(requireOneSlicingArgument: false, slicingArguments: ["limit"])
+  incomeLevels: [String!]! @join__field(graph: GEO)
+  naturalEvent(id: ID!): NaturalEvent @join__field(graph: HAZARDS)
+  naturalEvents(
+    filter: NaturalEventFilter
+    sort: NaturalEventSort
+    first: Int = 25
+    after: String
+  ): NaturalEventConnection! @join__field(graph: HAZARDS) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+  hazardCategories: [HazardCategory!]! @join__field(graph: HAZARDS)
+  hazardSources: [HazardSource!]! @join__field(graph: HAZARDS)
+  hazardStats(filter: NaturalEventFilter): HazardStats! @join__field(graph: HAZARDS)
+  hazardTimeline(filter: NaturalEventFilter, bucket: TimeBucket = MONTH): [HazardTimelinePoint!]! @join__field(graph: HAZARDS) @listSize(assumedSize: 400)
+  watchZones: [WatchZone!]! @join__field(graph: OPS)
+  watchZone(id: ID!): WatchZone @join__field(graph: OPS)
+  dataSources: [DataSource!]! @join__field(graph: OPS)
+  dataSource(id: ID!): DataSource @join__field(graph: OPS)
+  ingestRuns(source: ID, status: IngestStatus, first: Int = 20, after: String): IngestRunConnection! @join__field(graph: OPS) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+  ingestRun(id: ID!): IngestRun @join__field(graph: OPS)
+  """
+  Total number of collected records across all sources.
+  """
+  totalRecords: Int! @join__field(graph: OPS)
+  systemStatus: [ServiceStatus!]! @join__field(graph: OPS)
+  earthquake(id: ID!): Earthquake @join__field(graph: SEISMIC)
+  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection! @join__field(graph: SEISMIC) @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+  earthquakeStats(filter: EarthquakeFilter): EarthquakeStats! @join__field(graph: SEISMIC)
+  earthquakeTimeline(filter: EarthquakeFilter, bucket: TimeBucket = DAY): [TimeBucketCount!]! @join__field(graph: SEISMIC) @listSize(assumedSize: 400)
+  magnitudeHistogram(filter: EarthquakeFilter): [MagnitudeBin!]! @join__field(graph: SEISMIC) @listSize(assumedSize: 20)
+  topSeismicCountries(filter: EarthquakeFilter, limit: Int = 10): [CountrySeismicity!]! @join__field(graph: SEISMIC) @listSize(requireOneSlicingArgument: false, slicingArguments: ["limit"])
+  earthquakeTypes: [String!]! @join__field(graph: SEISMIC)
+}
+
+type PageInfo @join__type(graph: HAZARDS) @join__type(graph: OPS) @join__type(graph: SEISMIC) {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type HazardCategory @join__type(graph: HAZARDS, key: "id") {
+  id: ID!
+  title: String!
+  description: String
+  eventCount(status: EventStatus): Int!
+  events(
+    filter: NaturalEventFilter
+    sort: NaturalEventSort
+    first: Int = 25
+    after: String
+  ): NaturalEventConnection! @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+}
+
+type HazardSource @join__type(graph: HAZARDS) {
+  id: ID!
+  title: String!
+  url: String
+  eventCount: Int!
+}
+
+type EventSourceLink @join__type(graph: HAZARDS) {
+  source: HazardSource!
+  url: String
+}
+
+type EventMagnitude @join__type(graph: HAZARDS) {
+  value: Float!
+  unit: String
+}
+
+type EventPoint @join__type(graph: HAZARDS) {
+  observedAt: DateTime!
+  latitude: Float!
+  longitude: Float!
+  geometryType: String!
+  magnitude: EventMagnitude
+}
+
+"""
+Cross-domain correlation: earthquakes around a NASA EONET natural event (e.g. volcano unrest).
+"""
+type NaturalEvent @join__type(graph: HAZARDS, key: "id") @join__type(graph: SEISMIC, key: "id") {
+  id: ID!
+  title: String! @join__field(graph: HAZARDS)
+  description: String @join__field(graph: HAZARDS)
+  link: String @join__field(graph: HAZARDS)
+  status: EventStatus! @join__field(graph: HAZARDS)
+  startedAt: DateTime! @join__field(graph: HAZARDS) @join__field(graph: SEISMIC, external: true)
+  lastObservedAt: DateTime! @join__field(graph: HAZARDS)
+  closedAt: DateTime @join__field(graph: HAZARDS)
+  durationDays: Float! @join__field(graph: HAZARDS)
+  """
+  Latest observed position.
+  """
+  latitude: Float! @join__field(graph: HAZARDS) @join__field(graph: SEISMIC, external: true)
+  longitude: Float! @join__field(graph: HAZARDS) @join__field(graph: SEISMIC, external: true)
+  magnitude: EventMagnitude @join__field(graph: HAZARDS)
+  primaryCategory: HazardCategory! @join__field(graph: HAZARDS)
+  categories: [HazardCategory!]! @join__field(graph: HAZARDS)
+  sources: [EventSourceLink!]! @join__field(graph: HAZARDS)
+  pointCount: Int! @join__field(graph: HAZARDS)
+  """
+  Observed positions over time (storm tracks, fire perimeters).
+  """
+  track(first: Int = 50): [EventPoint!]! @join__field(graph: HAZARDS) @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  country: Country @join__field(graph: HAZARDS)
+  """
+  Other natural events within radiusKm active around the same time.
+  """
+  related(radiusKm: Float = 300, first: Int = 5): [NaturalEvent!]! @join__field(graph: HAZARDS) @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  nearbyEarthquakes(radiusKm: Float = 200, days: Int = 30, first: Int = 10): [Earthquake!] @join__field(graph: SEISMIC, requires: "latitude longitude startedAt") @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+}
+
+type NaturalEventEdge @join__type(graph: HAZARDS) {
+  cursor: String!
+  node: NaturalEvent!
+}
+
+type NaturalEventConnection @join__type(graph: HAZARDS) {
+  edges: [NaturalEventEdge!]!
+  nodes: [NaturalEvent!]!
+  pageInfo: PageInfo!
+  totalCount: Int! @cost(weight: 5)
+}
+
+type CategoryCount @join__type(graph: HAZARDS) {
+  category: HazardCategory!
+  count: Int!
+  open: Int!
+}
+
+type HazardStats @join__type(graph: HAZARDS) {
+  count: Int!
+  open: Int!
+  closed: Int!
+  avgDurationDays: Float
+  firstAt: DateTime
+  lastAt: DateTime
+  byCategory: [CategoryCount!]!
+}
+
+type HazardTimelinePoint @join__type(graph: HAZARDS) {
+  bucket: DateTime!
+  count: Int!
+}
+
+"""
+A user-defined circular area of interest. Seismic and hazards subgraphs attach matching events to it.
+"""
+type WatchZone @join__type(graph: HAZARDS, key: "id") @join__type(graph: OPS, key: "id") @join__type(graph: SEISMIC, key: "id") {
+  id: ID!
+  latitude: Float! @join__field(graph: HAZARDS, external: true) @join__field(graph: OPS) @join__field(graph: SEISMIC, external: true)
+  longitude: Float! @join__field(graph: HAZARDS, external: true) @join__field(graph: OPS) @join__field(graph: SEISMIC, external: true)
+  radiusKm: Float! @join__field(graph: HAZARDS, external: true) @join__field(graph: OPS) @join__field(graph: SEISMIC, external: true)
+  naturalEvents(first: Int = 10, days: Int = 30): [NaturalEvent!] @join__field(graph: HAZARDS, requires: "latitude longitude radiusKm") @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  naturalEventCount(days: Int = 30): Int @join__field(graph: HAZARDS, requires: "latitude longitude radiusKm")
+  name: String! @join__field(graph: OPS)
+  description: String @join__field(graph: OPS)
+  minMagnitude: Float! @join__field(graph: OPS) @join__field(graph: SEISMIC, external: true)
+  color: String! @join__field(graph: OPS)
+  createdAt: DateTime! @join__field(graph: OPS)
+  updatedAt: DateTime! @join__field(graph: OPS)
+  earthquakes(first: Int = 10, days: Int = 30): [Earthquake!] @join__field(graph: SEISMIC, requires: "latitude longitude radiusKm minMagnitude") @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  earthquakeCount(days: Int = 30): Int @join__field(graph: SEISMIC, requires: "latitude longitude radiusKm minMagnitude")
+}
+
+type FieldError @join__type(graph: OPS) {
+  field: String!
+  message: String!
+}
+
+type WatchZonePayload @join__type(graph: OPS) {
+  zone: WatchZone
+  errors: [FieldError!]!
+}
+
+type DeletePayload @join__type(graph: OPS) {
+  id: ID!
+  deleted: Boolean!
+}
+
+type IngestRun @join__type(graph: OPS) {
+  id: ID!
+  source: DataSource!
+  mode: IngestMode!
+  triggeredBy: String!
+  status: IngestStatus!
+  progress: Float!
+  message: String
+  recordsFetched: Int!
+  recordsUpserted: Int!
+  totalRecords: Int
+  warnings: [String!]!
+  error: String
+  startedAt: DateTime!
+  finishedAt: DateTime
+  durationMs: Int
+  host: String
+}
+
+type IngestRunEdge @join__type(graph: OPS) {
+  cursor: String!
+  node: IngestRun!
+}
+
+type IngestRunConnection @join__type(graph: OPS) {
+  edges: [IngestRunEdge!]!
+  nodes: [IngestRun!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"""
+An external system GeoPulse collects data from.
+"""
+type DataSource @join__type(graph: OPS) {
+  id: ID!
+  name: String!
+  description: String!
+  homepage: String!
+  """
+  Subgraph service that owns the collector and the data.
+  """
+  service: String!
+  refreshInterval: String!
+  health: SourceHealth!
+  """
+  Rows owned by this source after its last successful run.
+  """
+  recordCount: Int
+  lastRun: IngestRun
+  lastSuccessAt: DateTime
+  runs(first: Int = 10, after: String, status: IngestStatus): IngestRunConnection! @listSize(
+    requireOneSlicingArgument: false
+    slicingArguments: ["first"]
+    sizedFields: ["edges", "nodes"]
+  )
+}
+
+type ServiceStatus @join__type(graph: OPS) {
+  name: String!
+  url: String!
+  up: Boolean!
+  latencyMs: Int
+  detail: String
+}
+
+type TriggerIngestPayload @join__type(graph: OPS) {
+  accepted: Boolean!
+  runId: ID
+  message: String!
+}
+
+type Mutation @join__type(graph: OPS) {
+  createWatchZone(input: WatchZoneInput!): WatchZonePayload!
+  updateWatchZone(id: ID!, patch: WatchZonePatch!): WatchZonePayload!
+  deleteWatchZone(id: ID!): DeletePayload!
+  """
+  Asks the owning service to start a collector run; progress is streamed via `ingestRunUpdated`.
+  """
+  triggerIngest(source: ID!, mode: IngestMode = INCREMENTAL): TriggerIngestPayload!
+}
+
+type Subscription @join__type(graph: OPS) @join__type(graph: SEISMIC) {
+  ingestRunUpdated(source: ID): IngestRun! @join__field(graph: OPS)
+  """
+  Fires when the collector stores a previously unseen earthquake.
+  """
+  earthquakeDetected(minMagnitude: Float = 0): Earthquake! @join__field(graph: SEISMIC)
+}
+
+type Earthquake @join__type(graph: SEISMIC, key: "id") {
+  id: ID!
+  time: DateTime!
+  updatedAt: DateTime!
+  magnitude: Float
+  magnitudeType: String
+  depthKm: Float
+  latitude: Float!
+  longitude: Float!
+  place: String
+  type: String!
+  status: String
+  tsunami: Boolean!
+  alert: AlertLevel
+  felt: Int
+  cdi: Float
+  mmi: Float
+  significance: Int
+  network: String
+  url: String
+  severity: Severity!
+  """
+  Radiated seismic energy estimate, log10 E = 1.5 M + 4.8 (Gutenberg-Richter).
+  """
+  energyJoules: Float
+  country: Country
+  """
+  Other earthquakes within `radiusKm`, closest in time first.
+  """
+  nearby(radiusKm: Float = 150, first: Int = 5): [Earthquake!]! @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+  """
+  Events that followed within `hours` and `radiusKm` — candidate aftershocks.
+  """
+  aftershocks(radiusKm: Float = 100, hours: Int = 72, first: Int = 20): [Earthquake!]! @listSize(requireOneSlicingArgument: false, slicingArguments: ["first"])
+}
+
+type EarthquakeEdge @join__type(graph: SEISMIC) {
+  cursor: String!
+  node: Earthquake!
+}
+
+type EarthquakeConnection @join__type(graph: SEISMIC) {
+  edges: [EarthquakeEdge!]!
+  nodes: [Earthquake!]!
+  pageInfo: PageInfo!
+  totalCount: Int! @cost(weight: 5)
+}
+
+type EarthquakeStats @join__type(graph: SEISMIC) {
+  count: Int!
+  avgMagnitude: Float
+  maxMagnitude: Float
+  avgDepthKm: Float
+  tsunamiCount: Int!
+  feltReports: Int!
+  totalEnergyJoules: Float
+  firstAt: DateTime
+  lastAt: DateTime
+  strongest: Earthquake
+}
+
+type TimeBucketCount @join__type(graph: SEISMIC) {
+  bucket: DateTime!
+  count: Int!
+  maxMagnitude: Float
+}
+
+type MagnitudeBin @join__type(graph: SEISMIC) {
+  """
+  Lower bound of a 0.5-wide bin.
+  """
+  from: Float!
+  to: Float!
+  count: Int!
+}
+
+type CountrySeismicity @join__type(graph: SEISMIC) {
+  country: Country!
+  count: Int!
+  maxMagnitude: Float
+  avgMagnitude: Float
+}
+
+enum SortDirection @join__type(graph: GEO) @join__type(graph: HAZARDS) @join__type(graph: SEISMIC) {
+  ASC @join__enumValue(graph: GEO) @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+  DESC @join__enumValue(graph: GEO) @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+}
+
+"""
+World Bank World Development Indicators tracked by GeoPulse.
+"""
+enum IndicatorId @join__type(graph: GEO) {
+  POPULATION @join__enumValue(graph: GEO)
+  GDP @join__enumValue(graph: GEO)
+  GDP_PER_CAPITA @join__enumValue(graph: GEO)
+  LIFE_EXPECTANCY @join__enumValue(graph: GEO)
+  URBAN_POPULATION_PCT @join__enumValue(graph: GEO)
+  ELECTRICITY_ACCESS_PCT @join__enumValue(graph: GEO)
+  FOREST_AREA_PCT @join__enumValue(graph: GEO)
+  CO2_PER_CAPITA @join__enumValue(graph: GEO)
+}
+
+enum CountrySortField @join__type(graph: GEO) {
+  NAME @join__enumValue(graph: GEO)
+  POPULATION @join__enumValue(graph: GEO)
+  AREA @join__enumValue(graph: GEO)
+  DENSITY @join__enumValue(graph: GEO)
+  GDP_PER_CAPITA @join__enumValue(graph: GEO)
+  LIFE_EXPECTANCY @join__enumValue(graph: GEO)
+}
+
+enum TimeBucket @join__type(graph: HAZARDS) @join__type(graph: SEISMIC) {
+  HOUR @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+  DAY @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+  WEEK @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+  MONTH @join__enumValue(graph: HAZARDS) @join__enumValue(graph: SEISMIC)
+}
+
+enum EventStatus @join__type(graph: HAZARDS) {
+  OPEN @join__enumValue(graph: HAZARDS)
+  CLOSED @join__enumValue(graph: HAZARDS)
+}
+
+enum NaturalEventSortField @join__type(graph: HAZARDS) {
+  STARTED_AT @join__enumValue(graph: HAZARDS)
+  LAST_OBSERVED_AT @join__enumValue(graph: HAZARDS)
+  MAGNITUDE @join__enumValue(graph: HAZARDS)
+  TITLE @join__enumValue(graph: HAZARDS)
+  DURATION @join__enumValue(graph: HAZARDS)
+}
+
+enum IngestMode @join__type(graph: OPS) {
+  FULL @join__enumValue(graph: OPS)
+  INCREMENTAL @join__enumValue(graph: OPS)
+}
+
+enum IngestStatus @join__type(graph: OPS) {
+  RUNNING @join__enumValue(graph: OPS)
+  SUCCEEDED @join__enumValue(graph: OPS)
+  PARTIAL @join__enumValue(graph: OPS)
+  FAILED @join__enumValue(graph: OPS)
+  INTERRUPTED @join__enumValue(graph: OPS)
+}
+
+enum SourceHealth @join__type(graph: OPS) {
+  HEALTHY @join__enumValue(graph: OPS)
+  STALE @join__enumValue(graph: OPS)
+  FAILING @join__enumValue(graph: OPS)
+  UNKNOWN @join__enumValue(graph: OPS)
+}
+
+enum AlertLevel @join__type(graph: SEISMIC) {
+  GREEN @join__enumValue(graph: SEISMIC)
+  YELLOW @join__enumValue(graph: SEISMIC)
+  ORANGE @join__enumValue(graph: SEISMIC)
+  RED @join__enumValue(graph: SEISMIC)
+}
+
+"""
+Descriptive class derived from magnitude (Richter scale bands).
+"""
+enum Severity @join__type(graph: SEISMIC) {
+  MICRO @join__enumValue(graph: SEISMIC)
+  MINOR @join__enumValue(graph: SEISMIC)
+  LIGHT @join__enumValue(graph: SEISMIC)
+  MODERATE @join__enumValue(graph: SEISMIC)
+  STRONG @join__enumValue(graph: SEISMIC)
+  MAJOR @join__enumValue(graph: SEISMIC)
+  GREAT @join__enumValue(graph: SEISMIC)
+}
+
+enum EarthquakeSortField @join__type(graph: SEISMIC) {
+  TIME @join__enumValue(graph: SEISMIC)
+  MAGNITUDE @join__enumValue(graph: SEISMIC)
+  DEPTH @join__enumValue(graph: SEISMIC)
+  SIGNIFICANCE @join__enumValue(graph: SEISMIC)
+  FELT @join__enumValue(graph: SEISMIC)
+}
+
+input FloatRange @join__type(graph: GEO) @join__type(graph: HAZARDS) @join__type(graph: SEISMIC) {
+  min: Float
+  max: Float
+}
+
+input CountryFilter @join__type(graph: GEO) {
+  """
+  Matches name, official name, Russian name, capital or code.
+  """
+  search: String
+  regions: [String!]
+  subregions: [String!]
+  landlocked: Boolean
+  independent: Boolean
+  unMember: Boolean
+  population: FloatRange
+  areaKm2: FloatRange
+  gdpPerCapita: FloatRange
+  languageCodes: [String!]
+  currencyCodes: [String!]
+  incomeLevels: [String!]
+  codes: [String!]
+}
+
+input CountrySort @join__type(graph: GEO) {
+  field: CountrySortField! = NAME
+  direction: SortDirection! = ASC
+}
+
+input TimeRange @join__type(graph: HAZARDS) @join__type(graph: SEISMIC) {
+  from: DateTime
+  to: DateTime
+}
+
+input GeoRadius @join__type(graph: HAZARDS) @join__type(graph: SEISMIC) {
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+}
+
+input NaturalEventFilter @join__type(graph: HAZARDS) {
+  """
+  Case-insensitive substring match on the title.
+  """
+  search: String
+  categoryIds: [ID!]
+  sourceIds: [ID!]
+  status: EventStatus
+  started: TimeRange
+  countryCodes: [String!]
+  near: GeoRadius
+  magnitude: FloatRange
+  magnitudeUnit: String
+  hasCountry: Boolean
+}
+
+input NaturalEventSort @join__type(graph: HAZARDS) {
+  field: NaturalEventSortField! = STARTED_AT
+  direction: SortDirection! = DESC
+}
+
+input WatchZoneInput @join__type(graph: OPS) {
+  name: String!
+  description: String
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+  minMagnitude: Float = 4
+  color: String
+}
+
+input WatchZonePatch @join__type(graph: OPS) {
+  name: String
+  description: String
+  latitude: Float
+  longitude: Float
+  radiusKm: Float
+  minMagnitude: Float
+  color: String
+}
+
+input EarthquakeFilter @join__type(graph: SEISMIC) {
+  """
+  Case-insensitive substring match on the place description (trigram indexed).
+  """
+  search: String
+  magnitude: FloatRange
+  depthKm: FloatRange
+  time: TimeRange
+  """
+  ISO 3166-1 alpha-3 country codes.
+  """
+  countryCodes: [String!]
+  """
+  Event type, e.g. earthquake, quarry blast, explosion.
+  """
+  types: [String!]
+  alertLevels: [AlertLevel!]
+  severities: [Severity!]
+  tsunami: Boolean
+  near: GeoRadius
+  minSignificance: Int
+  """
+  Only events attributed to some country (true) or offshore/unknown (false).
+  """
+  hasCountry: Boolean
+}
+
+input EarthquakeSort @join__type(graph: SEISMIC) {
+  field: EarthquakeSortField! = TIME
+  direction: SortDirection! = DESC
+}

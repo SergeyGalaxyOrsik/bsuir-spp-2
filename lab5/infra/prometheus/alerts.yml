@@ -1,0 +1,37 @@
+groups:
+  - name: geopulse
+    rules:
+      - alert: ServiceDown
+        expr: up{job!="local"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.service }} ({{ $labels.instance }}) is down"
+
+      - alert: HighGraphQLErrorRate
+        expr: sum(rate(graphql_envelop_error_result[5m])) / clamp_min(sum(rate(graphql_envelop_request_duration_count[5m])), 1) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 5% of GraphQL operations return errors"
+
+      - alert: SlowGateway
+        expr: histogram_quantile(0.95, sum by (le) (rate(graphql_yoga_http_duration_bucket{service=~"gateway.*"}[5m]))) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Gateway p95 latency above 1s"
+
+      - alert: IngestStale
+        expr: time() - geopulse_ingest_last_success_timestamp_seconds{source="usgs"} > 1800
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "USGS collector has not succeeded for 30 minutes"
+
+      - alert: LoadShedding
+        expr: sum(rate(geopulse_gateway_rejected_requests_total[5m])) > 1
+        for: 2m
+        labels: { severity: info }
+        annotations:
+          summary: "Gateway is rejecting requests (rate limit / overload)"

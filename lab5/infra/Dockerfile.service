@@ -1,0 +1,26 @@
+# Shared image for all backend services (subgraphs and gateway).
+# Usage: docker build -f infra/Dockerfile.service --build-arg SERVICE=services/seismic .
+FROM oven/bun:1.4.3 AS deps
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY packages/shared/package.json packages/shared/
+COPY services/geo/package.json services/geo/
+COPY services/seismic/package.json services/seismic/
+COPY services/hazards/package.json services/hazards/
+COPY services/ops/package.json services/ops/
+COPY apps/gateway/package.json apps/gateway/
+COPY apps/web/package.json apps/web/
+RUN bun install --frozen-lockfile --ignore-scripts --filter '!@geopulse/web'
+
+FROM node:24-slim
+ARG SERVICE
+ENV NODE_ENV=production SERVICE_DIR=/app/${SERVICE}
+WORKDIR /app
+COPY --from=deps /app ./
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY ${SERVICE} ${SERVICE}
+WORKDIR /app/${SERVICE}
+USER node
+# The gateway preloads its own OpenTelemetry setup, subgraphs use the shared one.
+CMD ["sh", "-c", "if [ -f src/instrument.ts ]; then PRELOAD=./src/instrument.ts; else PRELOAD=@geopulse/shared/telemetry; fi; exec node_modules/.bin/tsx --import $PRELOAD src/index.ts"]

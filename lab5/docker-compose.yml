@@ -108,6 +108,7 @@ services:
       <<: *service-env
       PORT: "4000"
       OTEL_SERVICE_NAME: gateway
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100}
       SUBGRAPHS: geo=http://geo:4001/graphql,seismic=http://seismic:4002/graphql,hazards=http://hazards:4003/graphql,ops=http://ops:4004/graphql
     depends_on:
       geo: { condition: service_healthy }
@@ -119,15 +120,19 @@ services:
 
   web:
     restart: unless-stopped
-    build: { context: ., dockerfile: apps/web/Dockerfile }
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_GRAPHQL_URL: ${PUBLIC_GRAPHQL_URL:-http://localhost:4000/graphql}
     environment:
       PORT: "3000"
+      # Server-side rendering talks to the gateway over the internal network.
       GRAPHQL_URL: http://gateway:4000/graphql
-      PUBLIC_GRAPHQL_URL: ${PUBLIC_GRAPHQL_URL:-http://localhost:4000/graphql}
     depends_on:
       gateway: { condition: service_healthy }
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3100}:3000"
 
 volumes:
   pgdata:

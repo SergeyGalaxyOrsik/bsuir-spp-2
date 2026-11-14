@@ -8,44 +8,228 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root"
-import { Route as IndexRouteImport } from "./routes/index"
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as ExplorerRouteImport } from './routes/explorer'
+import { Route as OpsRouteImport } from './routes/ops'
+import { Route as WatchRouteImport } from './routes/watch'
+import { Route as CountriesIndexRouteImport } from './routes/countries/index'
+import { Route as CountriesCodeRouteImport } from './routes/countries/$code'
+import { Route as EarthquakesIndexRouteImport } from './routes/earthquakes/index'
+import { Route as EarthquakesIdRouteImport } from './routes/earthquakes/$id'
+import { Route as EventsIndexRouteImport } from './routes/events/index'
+import { Route as EventsIdRouteImport } from './routes/events/$id'
 
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExplorerRoute = ExplorerRouteImport.update({
+  id: '/explorer',
+  path: '/explorer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpsRoute = OpsRouteImport.update({
+  id: '/ops',
+  path: '/ops',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WatchRoute = WatchRouteImport.update({
+  id: '/watch',
+  path: '/watch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesIndexRoute = CountriesIndexRouteImport.update({
+  id: '/countries/',
+  path: '/countries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesCodeRoute = CountriesCodeRouteImport.update({
+  id: '/countries/$code',
+  path: '/countries/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EarthquakesIndexRoute = EarthquakesIndexRouteImport.update({
+  id: '/earthquakes/',
+  path: '/earthquakes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EarthquakesIdRoute = EarthquakesIdRouteImport.update({
+  id: '/earthquakes/$id',
+  path: '/earthquakes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIdRoute = EventsIdRouteImport.update({
+  id: '/events/$id',
+  path: '/events/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/explorer': typeof ExplorerRoute
+  '/ops': typeof OpsRoute
+  '/watch': typeof WatchRoute
+  '/countries/$code': typeof CountriesCodeRoute
+  '/earthquakes/$id': typeof EarthquakesIdRoute
+  '/events/$id': typeof EventsIdRoute
+  '/countries/': typeof CountriesIndexRoute
+  '/earthquakes/': typeof EarthquakesIndexRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/explorer': typeof ExplorerRoute
+  '/ops': typeof OpsRoute
+  '/watch': typeof WatchRoute
+  '/countries/$code': typeof CountriesCodeRoute
+  '/earthquakes/$id': typeof EarthquakesIdRoute
+  '/events/$id': typeof EventsIdRoute
+  '/countries': typeof CountriesIndexRoute
+  '/earthquakes': typeof EarthquakesIndexRoute
+  '/events': typeof EventsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/explorer': typeof ExplorerRoute
+  '/ops': typeof OpsRoute
+  '/watch': typeof WatchRoute
+  '/countries/$code': typeof CountriesCodeRoute
+  '/earthquakes/$id': typeof EarthquakesIdRoute
+  '/events/$id': typeof EventsIdRoute
+  '/countries/': typeof CountriesIndexRoute
+  '/earthquakes/': typeof EarthquakesIndexRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/"
+  fullPaths:
+    | '/'
+    | '/explorer'
+    | '/ops'
+    | '/watch'
+    | '/countries/$code'
+    | '/earthquakes/$id'
+    | '/events/$id'
+    | '/countries/'
+    | '/earthquakes/'
+    | '/events/'
   fileRoutesByTo: FileRoutesByTo
-  to: "/"
-  id: "__root__" | "/"
+  to:
+    | '/'
+    | '/explorer'
+    | '/ops'
+    | '/watch'
+    | '/countries/$code'
+    | '/earthquakes/$id'
+    | '/events/$id'
+    | '/countries'
+    | '/earthquakes'
+    | '/events'
+  id:
+    | '__root__'
+    | '/'
+    | '/explorer'
+    | '/ops'
+    | '/watch'
+    | '/countries/$code'
+    | '/earthquakes/$id'
+    | '/events/$id'
+    | '/countries/'
+    | '/earthquakes/'
+    | '/events/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ExplorerRoute: typeof ExplorerRoute
+  OpsRoute: typeof OpsRoute
+  WatchRoute: typeof WatchRoute
+  CountriesCodeRoute: typeof CountriesCodeRoute
+  EarthquakesIdRoute: typeof EarthquakesIdRoute
+  EventsIdRoute: typeof EventsIdRoute
+  CountriesIndexRoute: typeof CountriesIndexRoute
+  EarthquakesIndexRoute: typeof EarthquakesIndexRoute
+  EventsIndexRoute: typeof EventsIndexRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/"
-      path: "/"
-      fullPath: "/"
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explorer': {
+      id: '/explorer'
+      path: '/explorer'
+      fullPath: '/explorer'
+      preLoaderRoute: typeof ExplorerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ops': {
+      id: '/ops'
+      path: '/ops'
+      fullPath: '/ops'
+      preLoaderRoute: typeof OpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/watch': {
+      id: '/watch'
+      path: '/watch'
+      fullPath: '/watch'
+      preLoaderRoute: typeof WatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/': {
+      id: '/countries/'
+      path: '/countries'
+      fullPath: '/countries/'
+      preLoaderRoute: typeof CountriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/$code': {
+      id: '/countries/$code'
+      path: '/countries/$code'
+      fullPath: '/countries/$code'
+      preLoaderRoute: typeof CountriesCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/earthquakes/': {
+      id: '/earthquakes/'
+      path: '/earthquakes'
+      fullPath: '/earthquakes/'
+      preLoaderRoute: typeof EarthquakesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/earthquakes/$id': {
+      id: '/earthquakes/$id'
+      path: '/earthquakes/$id'
+      fullPath: '/earthquakes/$id'
+      preLoaderRoute: typeof EarthquakesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$id': {
+      id: '/events/$id'
+      path: '/events/$id'
+      fullPath: '/events/$id'
+      preLoaderRoute: typeof EventsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -53,14 +237,23 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ExplorerRoute: ExplorerRoute,
+  OpsRoute: OpsRoute,
+  WatchRoute: WatchRoute,
+  CountriesCodeRoute: CountriesCodeRoute,
+  EarthquakesIdRoute: EarthquakesIdRoute,
+  EventsIdRoute: EventsIdRoute,
+  CountriesIndexRoute: CountriesIndexRoute,
+  EarthquakesIndexRoute: EarthquakesIndexRoute,
+  EventsIndexRoute: EventsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>

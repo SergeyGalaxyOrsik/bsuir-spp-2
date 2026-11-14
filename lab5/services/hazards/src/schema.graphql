@@ -167,9 +167,9 @@ type HazardTimelinePoint {
 
 type Country @key(fields: "code") {
   code: ID!
-  naturalEvents(filter: NaturalEventFilter, sort: NaturalEventSort, first: Int = 25, after: String): NaturalEventConnection!
+  naturalEvents(filter: NaturalEventFilter, sort: NaturalEventSort, first: Int = 25, after: String): NaturalEventConnection
     @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
-  hazardStats(filter: NaturalEventFilter): HazardStats!
+  hazardStats(filter: NaturalEventFilter): HazardStats
 }
 
 type WatchZone @key(fields: "id") {
@@ -177,10 +177,10 @@ type WatchZone @key(fields: "id") {
   latitude: Float! @external
   longitude: Float! @external
   radiusKm: Float! @external
-  naturalEvents(first: Int = 10, days: Int = 30): [NaturalEvent!]!
+  naturalEvents(first: Int = 10, days: Int = 30): [NaturalEvent!]
     @requires(fields: "latitude longitude radiusKm")
     @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
-  naturalEventCount(days: Int = 30): Int! @requires(fields: "latitude longitude radiusKm")
+  naturalEventCount(days: Int = 30): Int @requires(fields: "latitude longitude radiusKm")
 }
 
 type Query {

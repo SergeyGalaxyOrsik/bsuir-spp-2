@@ -167,14 +167,18 @@ type CountrySeismicity {
   avgMagnitude: Float
 }
 
+"""
+Fields contributed to entities owned by other subgraphs are nullable: if this subgraph is down,
+the rest of the response still resolves (partial data + error) instead of nulling the parent.
+"""
 type Country @key(fields: "code") {
   code: ID!
-  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection!
+  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection
     @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
   "Latest events for this country — batched across countries in one SQL query."
-  recentEarthquakes(first: Int = 5, minMagnitude: Float): [Earthquake!]!
+  recentEarthquakes(first: Int = 5, minMagnitude: Float): [Earthquake!]
     @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
-  seismicStats(filter: EarthquakeFilter): EarthquakeStats!
+  seismicStats(filter: EarthquakeFilter): EarthquakeStats
 }
 
 type WatchZone @key(fields: "id") {
@@ -183,10 +187,10 @@ type WatchZone @key(fields: "id") {
   longitude: Float! @external
   radiusKm: Float! @external
   minMagnitude: Float! @external
-  earthquakes(first: Int = 10, days: Int = 30): [Earthquake!]!
+  earthquakes(first: Int = 10, days: Int = 30): [Earthquake!]
     @requires(fields: "latitude longitude radiusKm minMagnitude")
     @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
-  earthquakeCount(days: Int = 30): Int! @requires(fields: "latitude longitude radiusKm minMagnitude")
+  earthquakeCount(days: Int = 30): Int @requires(fields: "latitude longitude radiusKm minMagnitude")
 }
 
 "Cross-domain correlation: earthquakes around a NASA EONET natural event (e.g. volcano unrest)."
@@ -195,7 +199,7 @@ type NaturalEvent @key(fields: "id") {
   latitude: Float! @external
   longitude: Float! @external
   startedAt: DateTime! @external
-  nearbyEarthquakes(radiusKm: Float = 200, days: Int = 30, first: Int = 10): [Earthquake!]!
+  nearbyEarthquakes(radiusKm: Float = 200, days: Int = 30, first: Int = 10): [Earthquake!]
     @requires(fields: "latitude longitude startedAt")
     @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
 }

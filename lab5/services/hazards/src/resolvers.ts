@@ -220,7 +220,7 @@ export const resolvers = {
       ctx.sql`
         select ${COLUMNS(ctx.sql)} from hazards.events
         where id <> ${e.id} and ${nearFragment(ctx.sql, e.latitude, e.longitude, radiusKm)}
-          and started_at <= ${e.closedAt ?? e.lastObservedAt} + interval '30 days'
+          and started_at <= ${e.closedAt ?? e.lastObservedAt}::timestamptz + interval '30 days'
           and coalesce(closed_at, last_observed_at) >= ${e.startedAt}::timestamptz - interval '30 days'
         order by abs(extract(epoch from started_at - ${e.startedAt})) limit ${clampFirst(first, 5)}`,
   },
