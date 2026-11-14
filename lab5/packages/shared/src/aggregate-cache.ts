@@ -1,12 +1,12 @@
-import { envInt } from "@geopulse/shared";
+import { envInt } from "./env.ts";
 
 /**
- * Short-lived, process-wide memo for heavy aggregate queries (full-table GROUP BY over all
- * earthquakes). Identical arguments within `ttlMs` share one result, and concurrent identical
- * calls share one in-flight SQL query. The dashboard asks the same aggregates for every visitor,
- * and the gateway cannot cache that operation as a whole (it also selects uncacheable fields),
- * so without this every page view re-ran ~6 sequential scans. Data changes every 5 minutes
- * (USGS ingest), so a few seconds of staleness is invisible.
+ * Short-lived, process-wide memo for heavy aggregate queries (full-table GROUP BY). Identical
+ * arguments within `ttlMs` share one result, and concurrent identical calls share one in-flight
+ * SQL query. The dashboard asks the same aggregates for every visitor, and the gateway cannot
+ * cache that operation as a whole (it also selects uncacheable fields), so without this every
+ * page view re-ran several sequential scans. Sources refresh every 5-15 minutes, so a few seconds
+ * of staleness is invisible.
  */
 export function createAggregateCache(ttlMs = envInt("AGGREGATE_CACHE_TTL_MS", 15_000), max = 500) {
   const entries = new Map<string, { at: number; value: Promise<unknown> }>();

@@ -217,8 +217,10 @@ export const resolvers = {
       const year =
         args.year ??
         (await ctx.sql`
-          select max(year)::int as y from geo.indicator_values v join geo.countries c on c.code = v.country_code
-          where indicator_id = ${args.id} and value is not null`)[0]?.y;
+          select v.year::int as y from geo.indicator_values v
+          where v.indicator_id = ${args.id} and v.value is not null
+            and exists (select 1 from geo.countries c where c.code = v.country_code)
+          order by v.year desc limit 1`)[0]?.y;
       if (!year) return [];
       const rows = await ctx.sql`
         select v.country_code as code, v.year::int, v.value

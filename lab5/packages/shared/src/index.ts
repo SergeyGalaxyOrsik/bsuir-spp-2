@@ -12,3 +12,4 @@ export * from "./subgraph.ts";
 export * from "./tracing.ts";
 export * from "./service.ts";
 export * from "./geo-sql.ts";
+export * from "./aggregate-cache.ts";

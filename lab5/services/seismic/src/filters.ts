@@ -59,7 +59,11 @@ export function buildWhere(sql: Sql, filter: EarthquakeFilter | null | undefined
   if (f.depthKm?.max != null) parts.push(sql`depth_km <= ${f.depthKm.max}`);
   if (f.time?.from) parts.push(sql`time >= ${f.time.from}`);
   if (f.time?.to) parts.push(sql`time <= ${f.time.to}`);
-  if (f.countryCodes?.length) parts.push(sql`country_code = any(${f.countryCodes.map((c) => c.toUpperCase())})`);
+  if (f.countryCodes?.length) {
+    const codes = f.countryCodes.map((c) => c.toUpperCase());
+    // Plain equality lets `Country.earthquakes` walk earthquakes_country_mag_idx in sort order; `= any` forces a sort.
+    parts.push(codes.length === 1 ? sql`country_code = ${codes[0]!}` : sql`country_code = any(${codes})`);
+  }
   if (f.types?.length) parts.push(sql`type = any(${f.types})`);
   if (f.alertLevels?.length) parts.push(sql`alert = any(${f.alertLevels.map((a) => a.toLowerCase())})`);
   if (f.severities?.length) {

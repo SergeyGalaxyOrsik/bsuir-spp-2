@@ -151,7 +151,7 @@ export function eonetCollector(log: Logger): Collector {
         const { stored, changed } = await store(ctx.sql, geo, events);
         ctx.count(events.length, stored);
         // Live globe: every replica LISTENs on this channel (only incremental runs, a backfill would flood it).
-        for (const id of changed) await ctx.sql`select pg_notify('natural_events', ${id})`;
+        if (changed.length) await ctx.sql`select pg_notify('natural_events', id) from unnest(${changed}::text[]) as id`;
         await ctx.progress(1, `${stored} events refreshed, ${changed.length} changed`);
         return;
       }

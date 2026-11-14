@@ -75,15 +75,20 @@ export function createContext(sql: Sql) {
   });
   const lastRun = new DataLoader<string, Record<string, unknown> | null>(async (sources) => {
     const rows = await sql`
-      select distinct on (source) ${RUN_COLUMNS(sql)} from ops.ingest_runs
-      where source = any(${sources as string[]}) order by source, started_at desc`;
+      select ${RUN_COLUMNS(sql)}
+      from unnest(${sources as string[]}::text[]) as s(src)
+      cross join lateral (select * from ops.ingest_runs r where r.source = s.src order by r.started_at desc limit 1) ingest_runs`;
     const map = new Map(rows.map((r) => [r.source as string, r]));
     return sources.map((s) => map.get(s) ?? null);
   });
   const lastSuccess = new DataLoader<string, Record<string, unknown> | null>(async (sources) => {
     const rows = await sql`
-      select distinct on (source) source, finished_at as "finishedAt", total_records as "totalRecords" from ops.ingest_runs
-      where source = any(${sources as string[]}) and status in ('succeeded', 'partial') order by source, started_at desc`;
+      select s.source, r.finished_at as "finishedAt", r.total_records as "totalRecords"
+      from unnest(${sources as string[]}::text[]) as s(source)
+      cross join lateral (
+        select finished_at, total_records from ops.ingest_runs r
+        where r.source = s.source and r.status in ('succeeded', 'partial') order by r.started_at desc limit 1
+      ) r`;
     const map = new Map(rows.map((r) => [r.source as string, r]));
     return sources.map((s) => map.get(s) ?? null);
   });

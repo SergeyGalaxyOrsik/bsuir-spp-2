@@ -2,6 +2,7 @@ import {
   and,
   assertDays,
   clampFirst,
+  createAggregateCache,
   DateTimeScalar,
   type PgChannel,
   type Fragment,
@@ -81,6 +82,9 @@ function buildWhere(sql: Sql, f: NaturalEventFilter | undefined | null): Fragmen
 }
 
 const key = (v: unknown) => JSON.stringify(v ?? null);
+
+/** Root-level aggregates (dashboard, /events facets) are full scans; EONET refreshes every 15 minutes. */
+const aggregates = createAggregateCache();
 
 export function createContext(sql: Sql) {
   const byId = new DataLoader<string, EventRow | null>(async (ids) => {
@@ -165,25 +169,31 @@ export const resolvers = {
     hazardCategories: (_: unknown, __: unknown, ctx: Context) =>
       ctx.sql`select id, title, description from hazards.categories order by title`,
     hazardSources: (_: unknown, __: unknown, ctx: Context) =>
-      ctx.sql`
-        select s.id, s.title, s.url, count(es.event_id)::int as "eventCount"
-        from hazards.sources s left join hazards.event_sources es on es.source_id = s.id
-        group by s.id order by "eventCount" desc, s.title`,
-    hazardStats: (_: unknown, { filter }: { filter?: NaturalEventFilter }, ctx: Context) => stats(ctx, filter),
+      aggregates("sources", () =>
+        ctx.sql`
+          select s.id, s.title, s.url, count(es.event_id)::int as "eventCount"
+          from hazards.sources s left join hazards.event_sources es on es.source_id = s.id
+          group by s.id order by "eventCount" desc, s.title`.then((rows) => rows),
+      ),
+    hazardStats: (_: unknown, { filter }: { filter?: NaturalEventFilter }, ctx: Context) =>
+      aggregates(`stats:${key(filter)}`, () => stats(ctx, filter)),
     hazardTimeline: (_: unknown, { filter, bucket }: { filter?: NaturalEventFilter; bucket: TimeBucket }, ctx: Context) =>
-      ctx.sql`
-        select date_trunc(${TIME_BUCKETS[bucket]}, started_at) as bucket, count(*)::int as count
-        from hazards.events where ${buildWhere(ctx.sql, filter)}
-        group by 1 order by 1 desc limit 400`.then((rows) => rows.reverse()),
+      aggregates(`timeline:${bucket}:${key(filter)}`, () =>
+        ctx.sql`
+          select date_trunc(${TIME_BUCKETS[bucket]}, started_at) as bucket, count(*)::int as count
+          from hazards.events where ${buildWhere(ctx.sql, filter)}
+          group by 1 order by 1 desc limit 400`.then((rows) => rows.reverse()),
+      ),
   },
   HazardStats: {
-    byCategory: async (s: { filter?: NaturalEventFilter; countryCode?: string }, _: unknown, ctx: Context) => {
-      const where = and(ctx.sql, [buildWhere(ctx.sql, s.filter), s.countryCode ? ctx.sql`country_code = ${s.countryCode}` : ctx.sql`true`]);
-      const rows = await ctx.sql`
-        select primary_category_id as id, count(*)::int as count, count(*) filter (where closed_at is null)::int as open
-        from hazards.events where ${where} group by 1 order by count desc`;
-      return rows.map((r) => ({ categoryId: r.id, count: r.count, open: r.open }));
-    },
+    byCategory: (s: { filter?: NaturalEventFilter; countryCode?: string }, _: unknown, ctx: Context) =>
+      aggregates(`byCategory:${s.countryCode ?? ""}:${key(s.filter)}`, async () => {
+        const where = and(ctx.sql, [buildWhere(ctx.sql, s.filter), s.countryCode ? ctx.sql`country_code = ${s.countryCode}` : ctx.sql`true`]);
+        const rows = await ctx.sql`
+          select primary_category_id as id, count(*)::int as count, count(*) filter (where closed_at is null)::int as open
+          from hazards.events where ${where} group by 1 order by count desc`;
+        return rows.map((r) => ({ categoryId: r.id, count: r.count, open: r.open }));
+      }),
   },
   CategoryCount: {
     category: (c: { categoryId: string }, _: unknown, ctx: Context) => ctx.category.load(c.categoryId),

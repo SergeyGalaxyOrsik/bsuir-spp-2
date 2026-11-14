@@ -102,7 +102,7 @@ export function usgsCollector(log: Logger): Collector {
         const features = await fetchRange(ctx, new Date(now.getTime() - 2 * 86_400_000), now, minMagnitude);
         const inserted = await upsert(ctx.sql, geo, features);
         ctx.count(features.length, features.length);
-        for (const id of inserted) await ctx.sql`select pg_notify('earthquakes', ${id})`;
+        if (inserted.length) await ctx.sql`select pg_notify('earthquakes', id) from unnest(${inserted}::text[]) as id`;
         await ctx.progress(1, `${features.length} fetched, ${inserted.length} new`);
         return;
       }
