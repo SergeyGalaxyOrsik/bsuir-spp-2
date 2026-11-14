@@ -11,9 +11,8 @@ COPY apps/web/package.json apps/web/
 RUN bun install --frozen-lockfile --ignore-scripts --filter '@geopulse/web'
 COPY apps/web apps/web
 WORKDIR /app/apps/web
-# Browser-side gateway URL is baked into the client bundle; SSR uses GRAPHQL_URL at runtime.
-ARG VITE_GRAPHQL_URL=http://localhost:4000/graphql
-ENV VITE_GRAPHQL_URL=${VITE_GRAPHQL_URL}
+# Nothing environment-specific is baked in: the browser calls same-origin /graphql, which
+# server.mjs proxies to GRAPHQL_URL at runtime.
 RUN bun run build
 
 FROM node:24-slim

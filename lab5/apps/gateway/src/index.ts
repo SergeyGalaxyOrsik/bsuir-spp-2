@@ -123,6 +123,7 @@ app.use("/graphql", async (c, next) => {
 app.on(["GET", "POST", "OPTIONS"], "/graphql", (c) => {
   const headers = new Headers(c.req.raw.headers);
   headers.set("x-real-ip", clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress));
+  headers.delete("x-internal-token");
   return gateway.fetch(new Request(c.req.raw, { headers }));
 });
 

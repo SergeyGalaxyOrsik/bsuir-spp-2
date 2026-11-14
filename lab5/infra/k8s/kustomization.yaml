@@ -1,0 +1,6 @@
+# Whole stack: kubectl apply -k infra/k8s   (or ./infra/k8s/deploy.sh, which also builds images)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - base
+  - observability

@@ -1,0 +1,9 @@
+# Throughput runs only: raises the gateway's per-IP limits so a single load generator is not throttled.
+# Apply:   docker compose -f docker-compose.yml -f load-tests/compose.loadtest.yml up -d --no-deps gateway
+# Restore: docker compose up -d --no-deps gateway
+services:
+  gateway:
+    environment:
+      RATE_LIMIT_PER_SECOND: "${LT_RATE_LIMIT_PER_SECOND:-2000}"
+      RATE_LIMIT_BURST: "${LT_RATE_LIMIT_BURST:-4000}"
+      MAX_INFLIGHT_REQUESTS: "${LT_MAX_INFLIGHT_REQUESTS:-200}"

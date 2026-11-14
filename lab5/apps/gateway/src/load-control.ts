@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { Counter, Gauge } from "prom-client";
-import { registry } from "@geopulse/shared";
+import { INTERNAL_TOKEN, registry } from "@geopulse/shared";
 
 const rejected = new Counter({
   name: "geopulse_gateway_rejected_requests_total",
@@ -15,9 +15,14 @@ const inflightGauge = new Gauge({
   registers: [registry],
 });
 
-export function clientIp(headers: Headers, fallback = "unknown"): string {
-  // Only trust the proxy header the deployment controls; clients cannot spoof the socket address.
-  return headers.get("x-real-ip") ?? fallback;
+/**
+ * The rate-limit key. `x-real-ip` is honoured only from our own web proxy, which proves itself
+ * with the internal service token; anyone else is keyed by the socket address they connect from.
+ */
+export function clientIp(headers: Headers, socketAddress = "unknown"): string {
+  const forwarded = headers.get("x-real-ip");
+  if (forwarded && headers.get("x-internal-token") === INTERNAL_TOKEN()) return forwarded;
+  return socketAddress;
 }
 
 /**

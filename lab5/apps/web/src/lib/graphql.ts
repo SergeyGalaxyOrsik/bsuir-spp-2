@@ -1,9 +1,13 @@
 import type { TypedDocumentString } from "@/graphql/gen/graphql"
 
+/**
+ * SSR calls the gateway directly over the internal network; the browser uses the same-origin
+ * `/graphql`, which the web server proxies to the gateway (no CORS, nothing baked into the bundle).
+ */
 export const GRAPHQL_URL =
   typeof window === "undefined"
     ? (process.env.GRAPHQL_URL ?? "http://localhost:4000/graphql")
-    : (import.meta.env.VITE_GRAPHQL_URL ?? "http://localhost:4000/graphql")
+    : import.meta.env.VITE_GRAPHQL_URL || "/graphql"
 
 export interface GraphQLErrorShape {
   message: string

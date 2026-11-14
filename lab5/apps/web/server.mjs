@@ -6,8 +6,34 @@ import { Hono } from "hono"
 import { compress } from "hono/compress"
 import handler from "./dist/server/server.js"
 
+const GATEWAY = process.env.GRAPHQL_URL ?? "http://localhost:4000/graphql"
+
 const app = new Hono()
-app.use("*", compress())
+
+// Browser GraphQL traffic (queries, mutations and SSE subscriptions) is forwarded to the gateway.
+// x-real-ip is overwritten with the socket address so clients cannot spoof the rate-limit key.
+app.all("/graphql", async (c) => {
+  const headers = new Headers(c.req.raw.headers)
+  headers.delete("host")
+  headers.set("x-real-ip", c.env?.incoming?.socket?.remoteAddress ?? "unknown")
+  if (process.env.INTERNAL_TOKEN) headers.set("x-internal-token", process.env.INTERNAL_TOKEN)
+  const url = new URL(GATEWAY)
+  url.search = new URL(c.req.url).search
+  const upstream = await fetch(url, {
+    method: c.req.method,
+    headers,
+    body: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : c.req.raw.body,
+    duplex: "half",
+    signal: c.req.raw.signal,
+  }).catch(() => null)
+  if (!upstream) return c.json({ errors: [{ message: "Gateway unavailable", extensions: { code: "GATEWAY_UNAVAILABLE" } }] }, 502)
+  const out = new Headers(upstream.headers)
+  out.delete("content-encoding")
+  out.delete("content-length")
+  return new Response(upstream.body, { status: upstream.status, headers: out })
+})
+
+app.use("*", async (c, next) => (c.req.path === "/graphql" ? next() : compress()(c, next)))
 app.get("/health", (c) => c.json({ status: "ok", service: "web" }))
 app.use(
   "/assets/*",

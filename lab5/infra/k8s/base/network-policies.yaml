@@ -1,0 +1,44 @@
+# Zero-trust inside the namespace: only the edge (web, gateway) accepts outside traffic,
+# subgraphs accept the gateway / ops / Prometheus, Postgres accepts backend pods only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-from-backend
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: postgres }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { tier: backend }
+      ports:
+        - { port: 5432 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: subgraphs-from-gateway-and-ops
+spec:
+  podSelector:
+    matchLabels: { tier: backend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: gateway }
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: ops }
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge-public
+spec:
+  podSelector:
+    matchLabels: { tier: edge }
+  policyTypes: [Ingress]
+  ingress:
+    - {}
