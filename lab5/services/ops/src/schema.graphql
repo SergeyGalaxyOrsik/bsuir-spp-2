@@ -1,0 +1,166 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key", "@shareable", "@listSize"])
+
+scalar DateTime
+
+type PageInfo @shareable {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+"A user-defined circular area of interest. Seismic and hazards subgraphs attach matching events to it."
+type WatchZone @key(fields: "id") {
+  id: ID!
+  name: String!
+  description: String
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+  minMagnitude: Float!
+  color: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input WatchZoneInput {
+  name: String!
+  description: String
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+  minMagnitude: Float = 4
+  color: String
+}
+
+input WatchZonePatch {
+  name: String
+  description: String
+  latitude: Float
+  longitude: Float
+  radiusKm: Float
+  minMagnitude: Float
+  color: String
+}
+
+type FieldError {
+  field: String!
+  message: String!
+}
+
+type WatchZonePayload {
+  zone: WatchZone
+  errors: [FieldError!]!
+}
+
+type DeletePayload {
+  id: ID!
+  deleted: Boolean!
+}
+
+enum IngestMode {
+  FULL
+  INCREMENTAL
+}
+
+enum IngestStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  INTERRUPTED
+}
+
+enum SourceHealth {
+  HEALTHY
+  STALE
+  FAILING
+  UNKNOWN
+}
+
+type IngestRun {
+  id: ID!
+  source: DataSource!
+  mode: IngestMode!
+  triggeredBy: String!
+  status: IngestStatus!
+  progress: Float!
+  message: String
+  recordsFetched: Int!
+  recordsUpserted: Int!
+  totalRecords: Int
+  warnings: [String!]!
+  error: String
+  startedAt: DateTime!
+  finishedAt: DateTime
+  durationMs: Int
+  host: String
+}
+
+type IngestRunEdge {
+  cursor: String!
+  node: IngestRun!
+}
+
+type IngestRunConnection {
+  edges: [IngestRunEdge!]!
+  nodes: [IngestRun!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"An external system GeoPulse collects data from."
+type DataSource {
+  id: ID!
+  name: String!
+  description: String!
+  homepage: String!
+  "Subgraph service that owns the collector and the data."
+  service: String!
+  refreshInterval: String!
+  health: SourceHealth!
+  "Rows owned by this source after its last successful run."
+  recordCount: Int
+  lastRun: IngestRun
+  lastSuccessAt: DateTime
+  runs(first: Int = 10, after: String, status: IngestStatus): IngestRunConnection! @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+}
+
+type ServiceStatus {
+  name: String!
+  url: String!
+  up: Boolean!
+  latencyMs: Int
+  detail: String
+}
+
+type TriggerIngestPayload {
+  accepted: Boolean!
+  runId: ID
+  message: String!
+}
+
+type Query {
+  watchZones: [WatchZone!]!
+  watchZone(id: ID!): WatchZone
+  dataSources: [DataSource!]!
+  dataSource(id: ID!): DataSource
+  ingestRuns(source: ID, status: IngestStatus, first: Int = 20, after: String): IngestRunConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+  ingestRun(id: ID!): IngestRun
+  "Total number of collected records across all sources."
+  totalRecords: Int!
+  systemStatus: [ServiceStatus!]!
+}
+
+type Mutation {
+  createWatchZone(input: WatchZoneInput!): WatchZonePayload!
+  updateWatchZone(id: ID!, patch: WatchZonePatch!): WatchZonePayload!
+  deleteWatchZone(id: ID!): DeletePayload!
+  "Asks the owning service to start a collector run; progress is streamed via `ingestRunUpdated`."
+  triggerIngest(source: ID!, mode: IngestMode = INCREMENTAL): TriggerIngestPayload!
+}
+
+type Subscription {
+  ingestRunUpdated(source: ID): IngestRun!
+}

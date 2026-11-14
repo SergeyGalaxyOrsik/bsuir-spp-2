@@ -1,0 +1,185 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key", "@shareable", "@listSize", "@cost"])
+
+scalar DateTime
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+input FloatRange {
+  min: Float
+  max: Float
+}
+
+type GeoPoint {
+  latitude: Float!
+  longitude: Float!
+}
+
+"World Bank World Development Indicators tracked by GeoPulse."
+enum IndicatorId {
+  POPULATION
+  GDP
+  GDP_PER_CAPITA
+  LIFE_EXPECTANCY
+  URBAN_POPULATION_PCT
+  ELECTRICITY_ACCESS_PCT
+  FOREST_AREA_PCT
+  CO2_PER_CAPITA
+}
+
+type Indicator {
+  id: IndicatorId!
+  worldBankCode: String!
+  name: String!
+  unit: String
+  description: String
+}
+
+type IndicatorPoint {
+  year: Int!
+  value: Float
+}
+
+type IndicatorSeries {
+  indicator: Indicator!
+  points: [IndicatorPoint!]! @listSize(assumedSize: 30)
+  latest: IndicatorPoint
+  "Relative change between the first and the last non-null point, in percent."
+  changePct: Float
+}
+
+type IndicatorRank {
+  rank: Int!
+  country: Country!
+  year: Int!
+  value: Float!
+}
+
+type Weather {
+  temperatureC: Float
+  apparentTemperatureC: Float
+  humidity: Float
+  windSpeedKmh: Float
+  windDirection: Float
+  precipitationMm: Float
+  weatherCode: Int
+  description: String!
+  isDay: Boolean
+  observedAt: DateTime!
+  location: GeoPoint!
+}
+
+type Language @key(fields: "code") {
+  code: ID!
+  name: String!
+  countryCount: Int!
+  countries: [Country!]! @listSize(assumedSize: 30)
+}
+
+type Currency @key(fields: "code") {
+  code: ID!
+  name: String!
+  symbol: String
+  countries: [Country!]! @listSize(assumedSize: 30)
+}
+
+type Region {
+  name: String!
+  countryCount: Int!
+  population: Float
+  areaKm2: Float
+  subregions: [String!]!
+  countries(sort: CountrySort): [Country!]! @listSize(assumedSize: 60)
+}
+
+type Country @key(fields: "code") {
+  "ISO 3166-1 alpha-3 code."
+  code: ID!
+  isoAlpha2: String!
+  numericCode: String
+  name: String!
+  officialName: String!
+  "Name in another language, ISO 639-3 key from the source dataset (e.g. rus, deu, fra)."
+  localizedName(lang: String! = "rus"): String
+  capital: String
+  capitalLocation: GeoPoint
+  region: String!
+  subregion: String
+  location: GeoPoint
+  areaKm2: Float
+  landlocked: Boolean!
+  independent: Boolean
+  unMember: Boolean!
+  flag: String
+  flagUrl: String
+  topLevelDomains: [String!]!
+  callingCodes: [String!]!
+  incomeLevel: String
+  population: Float
+  gdpPerCapita: Float
+  lifeExpectancy: Float
+  "People per km²."
+  density: Float
+  neighbors: [Country!]! @listSize(assumedSize: 8)
+  languages: [Language!]!
+  currencies: [Currency!]!
+  indicator(id: IndicatorId!, fromYear: Int, toYear: Int): IndicatorSeries
+  indicators(ids: [IndicatorId!], fromYear: Int, toYear: Int): [IndicatorSeries!]! @listSize(assumedSize: 8)
+  weather: Weather
+}
+
+input CountryFilter {
+  "Matches name, official name, Russian name, capital or code."
+  search: String
+  regions: [String!]
+  subregions: [String!]
+  landlocked: Boolean
+  independent: Boolean
+  unMember: Boolean
+  population: FloatRange
+  areaKm2: FloatRange
+  gdpPerCapita: FloatRange
+  languageCodes: [String!]
+  currencyCodes: [String!]
+  incomeLevels: [String!]
+  codes: [String!]
+}
+
+enum CountrySortField {
+  NAME
+  POPULATION
+  AREA
+  DENSITY
+  GDP_PER_CAPITA
+  LIFE_EXPECTANCY
+}
+
+input CountrySort {
+  field: CountrySortField! = NAME
+  direction: SortDirection! = ASC
+}
+
+"Offset-paginated page (countries are a small, bounded set)."
+type CountryPage {
+  items: [Country!]!
+  total: Int!
+  limit: Int!
+  offset: Int!
+  hasMore: Boolean!
+}
+
+type Query {
+  country(code: ID!): Country
+  countries(filter: CountryFilter, sort: CountrySort, limit: Int = 20, offset: Int = 0): CountryPage!
+    @listSize(slicingArguments: ["limit"], sizedFields: ["items"], requireOneSlicingArgument: false)
+  regions: [Region!]! @listSize(assumedSize: 6)
+  languages(search: String, limit: Int = 50): [Language!]! @listSize(slicingArguments: ["limit"], requireOneSlicingArgument: false)
+  currencies(search: String, limit: Int = 50): [Currency!]! @listSize(slicingArguments: ["limit"], requireOneSlicingArgument: false)
+  indicators: [Indicator!]!
+  indicatorRanking(id: IndicatorId!, year: Int, limit: Int = 10, direction: SortDirection = DESC, region: String): [IndicatorRank!]!
+    @listSize(slicingArguments: ["limit"], requireOneSlicingArgument: false)
+  incomeLevels: [String!]!
+}

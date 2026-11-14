@@ -1,0 +1,194 @@
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.9"
+    import: ["@key", "@shareable", "@external", "@requires", "@listSize", "@cost"]
+  )
+
+scalar DateTime
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+type PageInfo @shareable {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input FloatRange {
+  min: Float
+  max: Float
+}
+
+input TimeRange {
+  from: DateTime
+  to: DateTime
+}
+
+input GeoRadius {
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+}
+
+enum TimeBucket {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+}
+
+enum EventStatus {
+  OPEN
+  CLOSED
+}
+
+type HazardCategory @key(fields: "id") {
+  id: ID!
+  title: String!
+  description: String
+  eventCount(status: EventStatus): Int!
+  events(filter: NaturalEventFilter, sort: NaturalEventSort, first: Int = 25, after: String): NaturalEventConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+}
+
+type HazardSource {
+  id: ID!
+  title: String!
+  url: String
+  eventCount: Int!
+}
+
+type EventSourceLink {
+  source: HazardSource!
+  url: String
+}
+
+type EventMagnitude {
+  value: Float!
+  unit: String
+}
+
+type EventPoint {
+  observedAt: DateTime!
+  latitude: Float!
+  longitude: Float!
+  geometryType: String!
+  magnitude: EventMagnitude
+}
+
+type NaturalEvent @key(fields: "id") {
+  id: ID!
+  title: String!
+  description: String
+  link: String
+  status: EventStatus!
+  startedAt: DateTime!
+  lastObservedAt: DateTime!
+  closedAt: DateTime
+  durationDays: Float!
+  "Latest observed position."
+  latitude: Float!
+  longitude: Float!
+  magnitude: EventMagnitude
+  primaryCategory: HazardCategory!
+  categories: [HazardCategory!]!
+  sources: [EventSourceLink!]!
+  pointCount: Int!
+  "Observed positions over time (storm tracks, fire perimeters)."
+  track(first: Int = 50): [EventPoint!]! @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+  country: Country
+  "Other natural events within radiusKm active around the same time."
+  related(radiusKm: Float = 300, first: Int = 5): [NaturalEvent!]! @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+}
+
+type NaturalEventEdge {
+  cursor: String!
+  node: NaturalEvent!
+}
+
+type NaturalEventConnection {
+  edges: [NaturalEventEdge!]!
+  nodes: [NaturalEvent!]!
+  pageInfo: PageInfo!
+  totalCount: Int! @cost(weight: 5)
+}
+
+input NaturalEventFilter {
+  "Case-insensitive substring match on the title."
+  search: String
+  categoryIds: [ID!]
+  sourceIds: [ID!]
+  status: EventStatus
+  started: TimeRange
+  countryCodes: [String!]
+  near: GeoRadius
+  magnitude: FloatRange
+  magnitudeUnit: String
+  hasCountry: Boolean
+}
+
+enum NaturalEventSortField {
+  STARTED_AT
+  LAST_OBSERVED_AT
+  MAGNITUDE
+  TITLE
+  DURATION
+}
+
+input NaturalEventSort {
+  field: NaturalEventSortField! = STARTED_AT
+  direction: SortDirection! = DESC
+}
+
+type CategoryCount {
+  category: HazardCategory!
+  count: Int!
+  open: Int!
+}
+
+type HazardStats {
+  count: Int!
+  open: Int!
+  closed: Int!
+  avgDurationDays: Float
+  firstAt: DateTime
+  lastAt: DateTime
+  byCategory: [CategoryCount!]!
+}
+
+type HazardTimelinePoint {
+  bucket: DateTime!
+  count: Int!
+}
+
+type Country @key(fields: "code") {
+  code: ID!
+  naturalEvents(filter: NaturalEventFilter, sort: NaturalEventSort, first: Int = 25, after: String): NaturalEventConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+  hazardStats(filter: NaturalEventFilter): HazardStats!
+}
+
+type WatchZone @key(fields: "id") {
+  id: ID!
+  latitude: Float! @external
+  longitude: Float! @external
+  radiusKm: Float! @external
+  naturalEvents(first: Int = 10, days: Int = 30): [NaturalEvent!]!
+    @requires(fields: "latitude longitude radiusKm")
+    @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+  naturalEventCount(days: Int = 30): Int! @requires(fields: "latitude longitude radiusKm")
+}
+
+type Query {
+  naturalEvent(id: ID!): NaturalEvent
+  naturalEvents(filter: NaturalEventFilter, sort: NaturalEventSort, first: Int = 25, after: String): NaturalEventConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+  hazardCategories: [HazardCategory!]!
+  hazardSources: [HazardSource!]!
+  hazardStats(filter: NaturalEventFilter): HazardStats!
+  hazardTimeline(filter: NaturalEventFilter, bucket: TimeBucket = MONTH): [HazardTimelinePoint!]! @listSize(assumedSize: 400)
+}

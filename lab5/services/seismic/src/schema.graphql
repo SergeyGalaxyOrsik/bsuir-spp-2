@@ -1,0 +1,218 @@
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.9"
+    import: ["@key", "@shareable", "@external", "@requires", "@listSize", "@cost"]
+  )
+
+scalar DateTime
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+type PageInfo @shareable {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input FloatRange {
+  min: Float
+  max: Float
+}
+
+input TimeRange {
+  from: DateTime
+  to: DateTime
+}
+
+input GeoRadius {
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+}
+
+enum AlertLevel {
+  GREEN
+  YELLOW
+  ORANGE
+  RED
+}
+
+"Descriptive class derived from magnitude (Richter scale bands)."
+enum Severity {
+  MICRO
+  MINOR
+  LIGHT
+  MODERATE
+  STRONG
+  MAJOR
+  GREAT
+}
+
+input EarthquakeFilter {
+  "Case-insensitive substring match on the place description (trigram indexed)."
+  search: String
+  magnitude: FloatRange
+  depthKm: FloatRange
+  time: TimeRange
+  "ISO 3166-1 alpha-3 country codes."
+  countryCodes: [String!]
+  "Event type, e.g. earthquake, quarry blast, explosion."
+  types: [String!]
+  alertLevels: [AlertLevel!]
+  severities: [Severity!]
+  tsunami: Boolean
+  near: GeoRadius
+  minSignificance: Int
+  "Only events attributed to some country (true) or offshore/unknown (false)."
+  hasCountry: Boolean
+}
+
+enum EarthquakeSortField {
+  TIME
+  MAGNITUDE
+  DEPTH
+  SIGNIFICANCE
+  FELT
+}
+
+input EarthquakeSort {
+  field: EarthquakeSortField! = TIME
+  direction: SortDirection! = DESC
+}
+
+enum TimeBucket {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+}
+
+type Earthquake @key(fields: "id") {
+  id: ID!
+  time: DateTime!
+  updatedAt: DateTime!
+  magnitude: Float
+  magnitudeType: String
+  depthKm: Float
+  latitude: Float!
+  longitude: Float!
+  place: String
+  type: String!
+  status: String
+  tsunami: Boolean!
+  alert: AlertLevel
+  felt: Int
+  cdi: Float
+  mmi: Float
+  significance: Int
+  network: String
+  url: String
+  severity: Severity!
+  "Radiated seismic energy estimate, log10 E = 1.5 M + 4.8 (Gutenberg-Richter)."
+  energyJoules: Float
+  country: Country
+  "Other earthquakes within `radiusKm`, closest in time first."
+  nearby(radiusKm: Float = 150, first: Int = 5): [Earthquake!]! @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+  "Events that followed within `hours` and `radiusKm` — candidate aftershocks."
+  aftershocks(radiusKm: Float = 100, hours: Int = 72, first: Int = 20): [Earthquake!]!
+    @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+}
+
+type EarthquakeEdge {
+  cursor: String!
+  node: Earthquake!
+}
+
+type EarthquakeConnection {
+  edges: [EarthquakeEdge!]!
+  nodes: [Earthquake!]!
+  pageInfo: PageInfo!
+  totalCount: Int! @cost(weight: 5)
+}
+
+type EarthquakeStats {
+  count: Int!
+  avgMagnitude: Float
+  maxMagnitude: Float
+  avgDepthKm: Float
+  tsunamiCount: Int!
+  feltReports: Int!
+  totalEnergyJoules: Float
+  firstAt: DateTime
+  lastAt: DateTime
+  strongest: Earthquake
+}
+
+type TimeBucketCount {
+  bucket: DateTime!
+  count: Int!
+  maxMagnitude: Float
+}
+
+type MagnitudeBin {
+  "Lower bound of a 0.5-wide bin."
+  from: Float!
+  to: Float!
+  count: Int!
+}
+
+type CountrySeismicity {
+  country: Country!
+  count: Int!
+  maxMagnitude: Float
+  avgMagnitude: Float
+}
+
+type Country @key(fields: "code") {
+  code: ID!
+  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+  "Latest events for this country — batched across countries in one SQL query."
+  recentEarthquakes(first: Int = 5, minMagnitude: Float): [Earthquake!]!
+    @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+  seismicStats(filter: EarthquakeFilter): EarthquakeStats!
+}
+
+type WatchZone @key(fields: "id") {
+  id: ID!
+  latitude: Float! @external
+  longitude: Float! @external
+  radiusKm: Float! @external
+  minMagnitude: Float! @external
+  earthquakes(first: Int = 10, days: Int = 30): [Earthquake!]!
+    @requires(fields: "latitude longitude radiusKm minMagnitude")
+    @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+  earthquakeCount(days: Int = 30): Int! @requires(fields: "latitude longitude radiusKm minMagnitude")
+}
+
+"Cross-domain correlation: earthquakes around a NASA EONET natural event (e.g. volcano unrest)."
+type NaturalEvent @key(fields: "id") {
+  id: ID!
+  latitude: Float! @external
+  longitude: Float! @external
+  startedAt: DateTime! @external
+  nearbyEarthquakes(radiusKm: Float = 200, days: Int = 30, first: Int = 10): [Earthquake!]!
+    @requires(fields: "latitude longitude startedAt")
+    @listSize(slicingArguments: ["first"], requireOneSlicingArgument: false)
+}
+
+type Query {
+  earthquake(id: ID!): Earthquake
+  earthquakes(filter: EarthquakeFilter, sort: EarthquakeSort, first: Int = 25, after: String): EarthquakeConnection!
+    @listSize(slicingArguments: ["first"], sizedFields: ["edges", "nodes"], requireOneSlicingArgument: false)
+  earthquakeStats(filter: EarthquakeFilter): EarthquakeStats!
+  earthquakeTimeline(filter: EarthquakeFilter, bucket: TimeBucket = DAY): [TimeBucketCount!]! @listSize(assumedSize: 400)
+  magnitudeHistogram(filter: EarthquakeFilter): [MagnitudeBin!]! @listSize(assumedSize: 20)
+  topSeismicCountries(filter: EarthquakeFilter, limit: Int = 10): [CountrySeismicity!]!
+    @listSize(slicingArguments: ["limit"], requireOneSlicingArgument: false)
+  earthquakeTypes: [String!]!
+}
+
+type Subscription {
+  "Fires when the collector stores a previously unseen earthquake."
+  earthquakeDetected(minMagnitude: Float = 0): Earthquake!
+}

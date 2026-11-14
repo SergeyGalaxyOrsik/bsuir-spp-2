@@ -1,0 +1,36 @@
+{
+  "name": "@geopulse/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./telemetry": "./src/telemetry.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@apollo/subgraph": "^2.16.0",
+    "@envelop/opentelemetry": "^10.0.1",
+    "@graphql-yoga/plugin-prometheus": "^7.1.0",
+    "@hono/node-server": "^2.1.8",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/context-async-hooks": "^3.1.1",
+    "@opentelemetry/core": "^3.1.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.301.2",
+    "@opentelemetry/instrumentation-http": "^0.301.2",
+    "@opentelemetry/resources": "^3.1.1",
+    "@opentelemetry/sdk-node": "^0.301.2",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
+    "@opentelemetry/semantic-conventions": "^1.45.0",
+    "dataloader": "^2.2.3",
+    "graphql": "16.15.0",
+    "graphql-yoga": "^6.1.0",
+    "hono": "^4.13.18",
+    "pino": "^10.4.0",
+    "postgres": "^4.1.1",
+    "prom-client": "^15.1.3"
+  }
+}

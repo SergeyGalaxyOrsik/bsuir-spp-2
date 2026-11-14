@@ -1,0 +1,23 @@
+{
+  "name": "@geopulse/seismic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --import @geopulse/shared/telemetry src/index.ts",
+    "start": "tsx --import @geopulse/shared/telemetry src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@geopulse/shared": "workspace:*",
+    "dataloader": "^2.2.3",
+    "graphql": "16.15.0",
+    "graphql-yoga": "^6.1.0",
+    "hono": "^4.13.18",
+    "postgres": "^4.1.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

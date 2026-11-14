@@ -1,0 +1,36 @@
+{
+  "name": "@geopulse/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
+    "start": "tsx --import ./src/instrument.ts src/index.ts",
+    "compose": "tsx src/compose-cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  },
+  "dependencies": {
+    "@escape.tech/graphql-armor-block-field-suggestions": "^3.0.1",
+    "@escape.tech/graphql-armor-max-aliases": "^2.6.2",
+    "@escape.tech/graphql-armor-max-depth": "^2.4.2",
+    "@escape.tech/graphql-armor-max-tokens": "^2.5.1",
+    "@geopulse/shared": "workspace:*",
+    "@graphql-hive/gateway-runtime": "^2.13.5",
+    "@graphql-hive/plugin-opentelemetry": "^1.5.10",
+    "@graphql-mesh/cache-inmemory-lru": "^0.11.3",
+    "@graphql-mesh/plugin-prometheus": "^2.2.10",
+    "@graphql-mesh/plugin-rate-limit": "^0.109.3",
+    "@graphql-mesh/transport-http": "^1.2.6",
+    "@hono/node-server": "^2.1.8",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/context-async-hooks": "^3.1.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.301.2",
+    "@theguild/federation-composition": "^0.27.0",
+    "graphql": "16.15.0",
+    "hono": "^4.13.18",
+    "prom-client": "^15.1.3"
+  }
+}

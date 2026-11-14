@@ -1,0 +1,68 @@
+import type { Logger } from "@geopulse/shared";
+import { composeServices } from "@theguild/federation-composition";
+import { parse } from "graphql";
+
+export interface SubgraphConfig {
+  name: string;
+  url: string;
+}
+
+export function subgraphsFromEnv(): SubgraphConfig[] {
+  const raw =
+    process.env.SUBGRAPHS ??
+    "geo=http://localhost:4001/graphql,seismic=http://localhost:4002/graphql,hazards=http://localhost:4003/graphql,ops=http://localhost:4004/graphql";
+  return raw.split(",").map((pair) => {
+    const [name, url] = pair.split("=");
+    if (!name || !url) throw new Error(`Invalid SUBGRAPHS entry "${pair}"`);
+    return { name, url };
+  });
+}
+
+async function fetchSdl(subgraph: SubgraphConfig): Promise<string> {
+  const res = await fetch(subgraph.url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: "{ _service { sdl } }" }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`${subgraph.name}: HTTP ${res.status}`);
+  const body = (await res.json()) as { data?: { _service?: { sdl?: string } }; errors?: { message: string }[] };
+  const sdl = body.data?._service?.sdl;
+  if (!sdl) throw new Error(`${subgraph.name}: ${body.errors?.[0]?.message ?? "no SDL returned"}`);
+  return sdl;
+}
+
+export async function compose(subgraphs: SubgraphConfig[]) {
+  const sdls = await Promise.all(subgraphs.map(async (s) => ({ ...s, sdl: await fetchSdl(s) })));
+  const result = composeServices(sdls.map((s) => ({ name: s.name, url: s.url, typeDefs: parse(s.sdl) })));
+  if (result.errors?.length) {
+    throw new Error(`Supergraph composition failed:\n${result.errors.map((e) => `- ${e.message}`).join("\n")}`);
+  }
+  return { supergraphSdl: result.supergraphSdl!, publicSdl: result.publicSdl! };
+}
+
+/**
+ * Supergraph source for the gateway: composes from live subgraphs on every poll.
+ * When a subgraph is down, the last good supergraph keeps serving (no outage on redeploys).
+ */
+export function supergraphLoader(subgraphs: SubgraphConfig[], log: Logger) {
+  let lastGood: string | undefined;
+  return async (): Promise<string> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const { supergraphSdl } = await compose(subgraphs);
+        if (supergraphSdl !== lastGood) log.info({ subgraphs: subgraphs.map((s) => s.name) }, "supergraph composed");
+        lastGood = supergraphSdl;
+        return supergraphSdl;
+      } catch (error) {
+        if (lastGood) {
+          log.warn({ err: (error as Error).message }, "recomposition failed, keeping previous supergraph");
+          return lastGood;
+        }
+        if (attempt >= 60) throw error;
+        log.warn({ attempt, err: (error as Error).message }, "subgraphs not ready, retrying composition");
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  };
+}
