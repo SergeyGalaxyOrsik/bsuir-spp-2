@@ -184,25 +184,46 @@ export async function startRun(
 }
 
 /**
- * Starts periodic collection: an immediate full backfill when the source has no data yet,
- * then incremental refreshes. Overlapping ticks are skipped by the advisory lock.
+ * A source needs a (resumable) backfill until one full run has completed. Checking the run log
+ * rather than "is the table empty" means a backfill cut short by a crash or a rolling restart is
+ * finished from its checkpoints instead of silently degrading to incremental refreshes.
+ */
+async function needsBackfill(sql: Sql, source: string) {
+  const rows = await sql`
+    select 1 from ops.ingest_runs where source = ${source} and mode = 'full' and status in ('succeeded', 'partial') limit 1`;
+  return rows.length === 0;
+}
+
+/**
+ * Starts periodic collection: a full backfill until one has completed, then incremental
+ * refreshes. Overlapping ticks (and other replicas) are skipped by the advisory lock.
  */
 export function scheduleCollectors(sql: Sql, log: Logger, collectors: Collector[]): () => void {
   const timers: NodeJS.Timeout[] = [];
   if (process.env.INGEST_SCHEDULE === "off") return () => undefined;
   for (const collector of collectors) {
-    const tick = async (first: boolean) => {
+    let retry: NodeJS.Timeout | undefined;
+    const tick = async () => {
       try {
-        const empty = first && Number(await collector.total(sql)) === 0;
-        const res = await startRun(sql, log, collector, empty ? "full" : "incremental", "schedule");
+        const full = await needsBackfill(sql, collector.source);
+        const res = await startRun(sql, log, collector, full ? "full" : "incremental", "schedule");
         await res?.done;
+        // A failed backfill (e.g. the pod network was not up yet) is retried within a minute
+        // instead of waiting a whole refresh interval; its checkpoints make the retry cheap.
+        if (res && full && !retry && (await needsBackfill(sql, collector.source))) {
+          retry = setTimeout(() => {
+            retry = undefined;
+            void tick();
+          }, 60_000);
+          timers.push(retry);
+        }
       } catch (error) {
         log.error({ source: collector.source, err: (error as Error).message }, "scheduled ingest crashed");
       }
     };
     const jitter = Math.round(Math.random() * 3000);
-    timers.push(setTimeout(() => void tick(true), 2000 + jitter));
-    timers.push(setInterval(() => void tick(false), collector.intervalMs));
+    timers.push(setTimeout(() => void tick(), 2000 + jitter));
+    timers.push(setInterval(() => void tick(), collector.intervalMs));
   }
   return () => timers.forEach((t) => clearTimeout(t));
 }

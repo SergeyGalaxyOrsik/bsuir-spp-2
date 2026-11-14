@@ -42,11 +42,19 @@ async function syncCatalog(ctx: IngestContext) {
   ctx.count(categories.length + sources.length, categories.length + sources.length);
 }
 
+/** Upserts events; returns the ids that are new or got a newer observation (for live notifications). */
 async function store(sql: Sql, geo: CountryLocator, events: EonetEvent[]) {
   const usable = events.filter((e) => e.geometry.length > 0 && e.categories.length > 0);
+  const changed: string[] = [];
   for (let i = 0; i < usable.length; i += 500) {
     const chunk = usable.slice(i, i + 500);
     await sql.begin(async (tx) => {
+      const before = new Map(
+        (await tx`select id, last_observed_at, closed_at from hazards.events where id = any(${chunk.map((e) => e.id)})`).map((r) => [
+          r.id as string,
+          `${(r.last_observed_at as Date).toISOString()}|${(r.closed_at as Date | null)?.toISOString() ?? ""}`,
+        ]),
+      );
       const rows = chunk.map((e) => {
         const sorted = [...e.geometry].sort((a, b) => a.date.localeCompare(b.date));
         const last = sorted.at(-1)!;
@@ -70,6 +78,8 @@ async function store(sql: Sql, geo: CountryLocator, events: EonetEvent[]) {
           point_count: sorted.length,
         };
       });
+      for (const r of rows)
+        if (before.get(r.id) !== `${r.last_observed_at.toISOString()}|${r.closed_at?.toISOString() ?? ""}`) changed.push(r.id);
       await tx`insert into hazards.events ${tx(rows)}
         on conflict (id) do update set title = excluded.title, description = excluded.description, closed_at = excluded.closed_at,
           started_at = excluded.started_at, last_observed_at = excluded.last_observed_at, latitude = excluded.latitude,
@@ -103,7 +113,7 @@ async function store(sql: Sql, geo: CountryLocator, events: EonetEvent[]) {
       for (let p = 0; p < points.length; p += 2000) await tx`insert into hazards.event_points ${tx(points.slice(p, p + 2000))}`;
     });
   }
-  return usable.length;
+  return { stored: usable.length, changed };
 }
 
 function quarters(fromYear: number, now: Date): [Date, Date][] {
@@ -138,9 +148,11 @@ export function eonetCollector(log: Logger): Collector {
       if (ctx.mode === "incremental") {
         const start = new Date(now.getTime() - 30 * 86_400_000);
         const { events } = await fetchJson<{ events: EonetEvent[] }>(`${EONET}/events?status=all&start=${day(start)}&end=${day(now)}`, opts);
-        const stored = await store(ctx.sql, geo, events);
+        const { stored, changed } = await store(ctx.sql, geo, events);
         ctx.count(events.length, stored);
-        await ctx.progress(1, `${stored} events refreshed`);
+        // Live globe: every replica LISTENs on this channel (only incremental runs, a backfill would flood it).
+        for (const id of changed) await ctx.sql`select pg_notify('natural_events', ${id})`;
+        await ctx.progress(1, `${stored} events refreshed, ${changed.length} changed`);
         return;
       }
 
@@ -152,7 +164,7 @@ export function eonetCollector(log: Logger): Collector {
         if (done.has(key) && !isCurrent) continue;
         try {
           const { events } = await fetchJson<{ events: EonetEvent[] }>(`${EONET}/events?status=all&start=${key}&end=${day(end)}`, opts);
-          const stored = await store(ctx.sql, geo, events);
+          const { stored } = await store(ctx.sql, geo, events);
           ctx.count(events.length, stored);
           if (!isCurrent) {
             done.add(key);

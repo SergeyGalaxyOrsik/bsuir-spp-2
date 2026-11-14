@@ -192,3 +192,8 @@ type Query {
   hazardStats(filter: NaturalEventFilter): HazardStats!
   hazardTimeline(filter: NaturalEventFilter, bucket: TimeBucket = MONTH): [HazardTimelinePoint!]! @listSize(assumedSize: 400)
 }
+
+type Subscription {
+  "Emitted when the collector stores a new natural event or a fresh observation of an existing one."
+  naturalEventUpdated(categoryIds: [ID!]): NaturalEvent!
+}

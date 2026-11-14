@@ -321,6 +321,18 @@ type WatchZone {
   earthquakeCount(days: Int = 30): Int
 }
 
+type Subscription {
+  """
+  Emitted when the collector stores a new natural event or a fresh observation of an existing one.
+  """
+  naturalEventUpdated(categoryIds: [ID!]): NaturalEvent!
+  ingestRunUpdated(source: ID): IngestRun!
+  """
+  Fires when the collector stores a previously unseen earthquake.
+  """
+  earthquakeDetected(minMagnitude: Float = 0): Earthquake!
+}
+
 type FieldError {
   field: String!
   message: String!
@@ -412,14 +424,6 @@ type Mutation {
   Asks the owning service to start a collector run; progress is streamed via `ingestRunUpdated`.
   """
   triggerIngest(source: ID!, mode: IngestMode = INCREMENTAL): TriggerIngestPayload!
-}
-
-type Subscription {
-  ingestRunUpdated(source: ID): IngestRun!
-  """
-  Fires when the collector stores a previously unseen earthquake.
-  """
-  earthquakeDetected(minMagnitude: Float = 0): Earthquake!
 }
 
 type Earthquake {

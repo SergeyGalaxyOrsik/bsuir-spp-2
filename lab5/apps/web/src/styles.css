@@ -128,3 +128,34 @@
     @apply font-sans;
     }
 }
+/* Natural-event markers on the live globe (react-globe.gl HTML layer). */
+.live-hazard {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgb(255 255 255 / 0.85);
+  border-radius: 9999px;
+  background: var(--c);
+  box-shadow: 0 0 8px var(--c);
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+.live-hazard[data-open="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--c);
+  animation: live-hazard-pulse 2.2s ease-out infinite;
+}
+.live-hazard[data-open="false"] {
+  opacity: 0.55;
+}
+@keyframes live-hazard-pulse {
+  from { transform: scale(0.6); opacity: 0.9; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-hazard::after { animation: none; }
+}

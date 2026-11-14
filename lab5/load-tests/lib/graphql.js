@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
-import { GRAPHQL_URL, SPOOF_IP, vuIp } from "./config.js";
+import { clientHeaders, GRAPHQL_URL, vuIp } from "./config.js";
 
 /** Share of GraphQL responses that carried `errors` (HTTP 200 with errors counts as a failure). */
 export const gqlErrors = new Rate("gql_errors");
@@ -13,9 +13,7 @@ export const gqlDuration = new Trend("gql_req_duration", true);
 export const rejected = new Counter("gql_rejected");
 
 export function headers(ipOctet) {
-  const h = { "content-type": "application/json", accept: "application/json" };
-  if (SPOOF_IP) h["x-real-ip"] = vuIp(ipOctet);
-  return h;
+  return { "content-type": "application/json", accept: "application/json", "accept-encoding": "gzip", ...clientHeaders(vuIp(ipOctet)) };
 }
 
 /**

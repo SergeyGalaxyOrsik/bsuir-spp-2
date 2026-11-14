@@ -270,6 +270,39 @@ export type DashboardLiveFeedSubscriptionVariables = Exact<{ [key: string]: neve
 
 export type DashboardLiveFeedSubscription = { earthquakeDetected: { id: string, magnitude: number | null, place: string | null, time: string, country: { flag: string | null } | null } };
 
+export type LiveQuakesPageQueryVariables = Exact<{
+  from: string;
+  min: number;
+  after?: string | null | undefined;
+}>;
+
+
+export type LiveQuakesPageQuery = { earthquakes: { nodes: Array<{ id: string, time: string, magnitude: number | null, depthKm: number | null, latitude: number, longitude: number, place: string | null, alert: AlertLevel | null, tsunami: boolean }>, pageInfo: { hasNextPage: boolean, endCursor: string | null } } };
+
+export type LiveHazardsPageQueryVariables = Exact<{
+  after?: string | null | undefined;
+}>;
+
+
+export type LiveHazardsPageQuery = { naturalEvents: { nodes: Array<{ id: string, title: string, status: EventStatus, startedAt: string, lastObservedAt: string, latitude: number, longitude: number, primaryCategory: { id: string, title: string } }>, pageInfo: { hasNextPage: boolean, endCursor: string | null } } };
+
+export type LiveHazardFragment = { id: string, title: string, status: EventStatus, startedAt: string, lastObservedAt: string, latitude: number, longitude: number, primaryCategory: { id: string, title: string } };
+
+export type LiveStormTracksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type LiveStormTracksQuery = { naturalEvents: { nodes: Array<{ id: string, title: string, lastObservedAt: string, track: Array<{ latitude: number, longitude: number }> }> } };
+
+export type LiveQuakeFeedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type LiveQuakeFeedSubscription = { earthquakeDetected: { id: string, time: string, magnitude: number | null, depthKm: number | null, latitude: number, longitude: number, place: string | null, alert: AlertLevel | null, tsunami: boolean } };
+
+export type LiveHazardFeedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type LiveHazardFeedSubscription = { naturalEventUpdated: { id: string, title: string, status: EventStatus, startedAt: string, lastObservedAt: string, latitude: number, longitude: number, primaryCategory: { id: string, title: string } } };
+
 export type RunFieldsFragment = { id: string, mode: IngestMode, triggeredBy: string, status: IngestStatus, progress: number, message: string | null, recordsFetched: number, recordsUpserted: number, totalRecords: number | null, warnings: Array<string>, error: string | null, startedAt: string, finishedAt: string | null, durationMs: number | null, host: string | null, source: { id: string, name: string } };
 
 export type OpsOverviewQueryVariables = Exact<{ [key: string]: never; }>;
@@ -347,6 +380,21 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
+export const LiveHazardFragmentDoc = new TypedDocumentString(`
+    fragment LiveHazard on NaturalEvent {
+  id
+  title
+  status
+  startedAt
+  lastObservedAt
+  latitude
+  longitude
+  primaryCategory {
+    id
+    title
+  }
+}
+    `, {"fragmentName":"LiveHazard"}) as unknown as TypedDocumentString<LiveHazardFragment, unknown>;
 export const RunFieldsFragmentDoc = new TypedDocumentString(`
     fragment RunFields on IngestRun {
   id
@@ -905,6 +953,114 @@ export const DashboardLiveFeedDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DashboardLiveFeedSubscription, DashboardLiveFeedSubscriptionVariables>;
+export const LiveQuakesPageDocument = new TypedDocumentString(`
+    query LiveQuakesPage($from: DateTime!, $min: Float!, $after: String) {
+  earthquakes(
+    filter: {time: {from: $from}, magnitude: {min: $min}}
+    sort: {field: TIME, direction: ASC}
+    first: 100
+    after: $after
+  ) {
+    nodes {
+      id
+      time
+      magnitude
+      depthKm
+      latitude
+      longitude
+      place
+      alert
+      tsunami
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<LiveQuakesPageQuery, LiveQuakesPageQueryVariables>;
+export const LiveHazardsPageDocument = new TypedDocumentString(`
+    query LiveHazardsPage($after: String) {
+  naturalEvents(
+    sort: {field: LAST_OBSERVED_AT, direction: DESC}
+    first: 100
+    after: $after
+  ) {
+    nodes {
+      ...LiveHazard
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+    fragment LiveHazard on NaturalEvent {
+  id
+  title
+  status
+  startedAt
+  lastObservedAt
+  latitude
+  longitude
+  primaryCategory {
+    id
+    title
+  }
+}`) as unknown as TypedDocumentString<LiveHazardsPageQuery, LiveHazardsPageQueryVariables>;
+export const LiveStormTracksDocument = new TypedDocumentString(`
+    query LiveStormTracks {
+  naturalEvents(
+    filter: {categoryIds: ["severeStorms"]}
+    sort: {field: LAST_OBSERVED_AT, direction: DESC}
+    first: 20
+  ) {
+    nodes {
+      id
+      title
+      lastObservedAt
+      track(first: 50) {
+        latitude
+        longitude
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<LiveStormTracksQuery, LiveStormTracksQueryVariables>;
+export const LiveQuakeFeedDocument = new TypedDocumentString(`
+    subscription LiveQuakeFeed {
+  earthquakeDetected(minMagnitude: 0) {
+    id
+    time
+    magnitude
+    depthKm
+    latitude
+    longitude
+    place
+    alert
+    tsunami
+  }
+}
+    `) as unknown as TypedDocumentString<LiveQuakeFeedSubscription, LiveQuakeFeedSubscriptionVariables>;
+export const LiveHazardFeedDocument = new TypedDocumentString(`
+    subscription LiveHazardFeed {
+  naturalEventUpdated {
+    ...LiveHazard
+  }
+}
+    fragment LiveHazard on NaturalEvent {
+  id
+  title
+  status
+  startedAt
+  lastObservedAt
+  latitude
+  longitude
+  primaryCategory {
+    id
+    title
+  }
+}`) as unknown as TypedDocumentString<LiveHazardFeedSubscription, LiveHazardFeedSubscriptionVariables>;
 export const OpsOverviewDocument = new TypedDocumentString(`
     query OpsOverview {
   totalRecords

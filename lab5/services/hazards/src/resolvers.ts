@@ -3,6 +3,7 @@ import {
   assertDays,
   clampFirst,
   DateTimeScalar,
+  type PgChannel,
   type Fragment,
   keysetConnection,
   nearFragment,
@@ -249,3 +250,19 @@ export const resolvers = {
     },
   },
 };
+
+/** `naturalEventUpdated`: ids arrive via Postgres NOTIFY, so it works from any replica. */
+export function subscriptionResolvers(channel: PgChannel) {
+  return {
+    naturalEventUpdated: {
+      subscribe: async function* (_: unknown, { categoryIds }: { categoryIds?: string[] | null }, ctx: Context) {
+        for await (const id of channel.subscribe()) {
+          ctx.byId.clear(id);
+          const event = await ctx.byId.load(id);
+          if (event && (!categoryIds?.length || categoryIds.includes(event.primaryCategoryId))) yield event;
+        }
+      },
+      resolve: (payload: EventRow) => payload,
+    },
+  };
+}

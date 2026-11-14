@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExplorerRouteImport } from './routes/explorer'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as OpsRouteImport } from './routes/ops'
 import { Route as WatchRouteImport } from './routes/watch'
 import { Route as CountriesIndexRouteImport } from './routes/countries/index'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ExplorerRoute = ExplorerRouteImport.update({
   id: '/explorer',
   path: '/explorer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OpsRoute = OpsRouteImport.update({
@@ -74,6 +80,7 @@ const EventsIdRoute = EventsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/explorer': typeof ExplorerRoute
+  '/live': typeof LiveRoute
   '/ops': typeof OpsRoute
   '/watch': typeof WatchRoute
   '/countries/$code': typeof CountriesCodeRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/explorer': typeof ExplorerRoute
+  '/live': typeof LiveRoute
   '/ops': typeof OpsRoute
   '/watch': typeof WatchRoute
   '/countries/$code': typeof CountriesCodeRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/explorer': typeof ExplorerRoute
+  '/live': typeof LiveRoute
   '/ops': typeof OpsRoute
   '/watch': typeof WatchRoute
   '/countries/$code': typeof CountriesCodeRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/explorer'
+    | '/live'
     | '/ops'
     | '/watch'
     | '/countries/$code'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/explorer'
+    | '/live'
     | '/ops'
     | '/watch'
     | '/countries/$code'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/explorer'
+    | '/live'
     | '/ops'
     | '/watch'
     | '/countries/$code'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExplorerRoute: typeof ExplorerRoute
+  LiveRoute: typeof LiveRoute
   OpsRoute: typeof OpsRoute
   WatchRoute: typeof WatchRoute
   CountriesCodeRoute: typeof CountriesCodeRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/explorer'
       fullPath: '/explorer'
       preLoaderRoute: typeof ExplorerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ops': {
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExplorerRoute: ExplorerRoute,
+  LiveRoute: LiveRoute,
   OpsRoute: OpsRoute,
   WatchRoute: WatchRoute,
   CountriesCodeRoute: CountriesCodeRoute,
@@ -250,12 +271,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

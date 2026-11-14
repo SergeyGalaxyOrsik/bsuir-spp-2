@@ -5,11 +5,12 @@
 //   3. demand control        → COST_ESTIMATED_TOO_EXPENSIVE (> MAX_QUERY_COST = 20 000)
 //   4. depth limit           → query deeper than 10 levels is rejected
 //   5. alias limit           → more than 15 aliases is rejected
-// Each check uses its own X-Real-IP so the steps do not influence each other.
+// Each check uses its own X-Real-IP (+ X-Internal-Token) so the steps do not influence each other.
+// With SPOOF_IP=0 all steps share the load generator address; run it alone then.
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Counter } from "k6/metrics";
-import { GRAPHQL_URL } from "../lib/config.js";
+import { clientHeaders, GRAPHQL_URL } from "../lib/config.js";
 import * as Q from "../lib/queries.js";
 
 const status429 = new Counter("protect_429");
@@ -24,7 +25,7 @@ export const options = {
   batchPerHost: 25,
 };
 
-const hdr = (ip) => ({ "content-type": "application/json", "x-real-ip": ip });
+const hdr = (ip) => ({ "content-type": "application/json", ...clientHeaders(ip) });
 const post = (ip, query, tags = {}) =>
   http.post(GRAPHQL_URL, JSON.stringify({ query }), { headers: hdr(ip), tags, responseCallback: http.expectedStatuses(200, 429) });
 const errorOf = (res) => {

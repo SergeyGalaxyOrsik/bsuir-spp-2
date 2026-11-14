@@ -3,14 +3,23 @@
 //   GRAPHQL_PATH  GraphQL endpoint path         (default /graphql)
 //   WEB_URL       SSR web origin                (default http://localhost:3100)
 //   SPOOF_IP      1 = send a distinct X-Real-IP per VU to emulate separate clients (default 1).
-//                 The gateway keys its token bucket and per-field limits by X-Real-IP; behind an
-//                 ingress that overwrites the header, set SPOOF_IP=0 and raise the limits instead.
+//                 The gateway keys its token bucket and per-field limits by X-Real-IP, but trusts the
+//                 header only together with X-Internal-Token (the web proxy's service token).
+//   INTERNAL_TOKEN service token sent with X-Real-IP (default: the docker-compose dev token).
+//                 Without a valid token the gateway keys all VUs by the load generator's address;
+//                 then set SPOOF_IP=0 and raise the limits instead.
 //   THINK_MS      mean pause between user actions in ms (scenario default if unset)
 
 export const BASE_URL = (__ENV.BASE_URL || "http://localhost:4000").replace(/\/$/, "");
 export const GRAPHQL_URL = BASE_URL + (__ENV.GRAPHQL_PATH || "/graphql");
 export const WEB_URL = (__ENV.WEB_URL || "http://localhost:3100").replace(/\/$/, "");
 export const SPOOF_IP = (__ENV.SPOOF_IP || "1") !== "0";
+export const INTERNAL_TOKEN = __ENV.INTERNAL_TOKEN || "geopulse-internal-dev-token";
+
+/** Headers that make the gateway treat the request as coming from client `ip`. */
+export function clientHeaders(ip) {
+  return SPOOF_IP ? { "x-real-ip": ip, "x-internal-token": INTERNAL_TOKEN } : {};
+}
 
 /** Stable pseudo client IP per VU (10.<scenario>.<hi>.<lo>). */
 export function vuIp(scenarioOctet = 10) {

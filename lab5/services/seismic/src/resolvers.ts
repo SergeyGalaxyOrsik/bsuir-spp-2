@@ -1,5 +1,6 @@
 import { assertDays, clampFirst, DateTimeScalar, keysetConnection, nearFragment, type PgChannel, type Sql, TIME_BUCKETS } from "@geopulse/shared";
 import DataLoader from "dataloader";
+import { createAggregateCache } from "./aggregate-cache.ts";
 import { argsKey, buildWhere, COLUMNS, type EarthquakeFilter, type EarthquakeSort, severityOf, SORTS } from "./filters.ts";
 
 export interface EarthquakeRow {
@@ -13,6 +14,8 @@ export interface EarthquakeRow {
 }
 
 const DEFAULT_SORT: EarthquakeSort = { field: "TIME", direction: "DESC" };
+/** Shared across requests: root-level aggregates (dashboard) are memoized for a few seconds. */
+const aggregates = createAggregateCache();
 
 export function createContext(sql: Sql) {
   const byId = new DataLoader<string, EarthquakeRow | null>(async (ids) => {
@@ -119,25 +122,30 @@ export function createResolvers(earthquakeChannel: PgChannel) {
       earthquake: (_: unknown, { id }: { id: string }, ctx: Context) => ctx.byId.load(id),
       earthquakes: (_: unknown, args: { filter?: EarthquakeFilter; sort?: EarthquakeSort; first?: number; after?: string }, ctx: Context) =>
         connection(ctx, buildWhere(ctx.sql, args.filter), args.sort, args),
-      earthquakeStats: (_: unknown, { filter }: { filter?: EarthquakeFilter }, ctx: Context) => stats(ctx, filter),
-      earthquakeTimeline: async (_: unknown, { filter, bucket }: { filter?: EarthquakeFilter; bucket: keyof typeof TIME_BUCKETS }, ctx: Context) => {
-        const unit = TIME_BUCKETS[bucket];
-        return ctx.sql`
-          select date_trunc(${unit}, time) as bucket, count(*)::int as count, max(magnitude)::float8 as "maxMagnitude"
-          from seismic.earthquakes where ${buildWhere(ctx.sql, filter)}
-          group by 1 order by 1 desc limit 400`.then((rows) => rows.reverse());
-      },
+      earthquakeStats: (_: unknown, { filter }: { filter?: EarthquakeFilter }, ctx: Context) =>
+        aggregates(`stats:${argsKey(filter)}`, () => stats(ctx, filter)),
+      earthquakeTimeline: (_: unknown, { filter, bucket }: { filter?: EarthquakeFilter; bucket: keyof typeof TIME_BUCKETS }, ctx: Context) =>
+        aggregates(`timeline:${bucket}:${argsKey(filter)}`, () =>
+          ctx.sql`
+            select date_trunc(${TIME_BUCKETS[bucket]}, time) as bucket, count(*)::int as count, max(magnitude)::float8 as "maxMagnitude"
+            from seismic.earthquakes where ${buildWhere(ctx.sql, filter)}
+            group by 1 order by 1 desc limit 400`.then((rows) => rows.reverse()),
+        ),
       magnitudeHistogram: (_: unknown, { filter }: { filter?: EarthquakeFilter }, ctx: Context) =>
-        ctx.sql`
-          select floor(magnitude * 2) / 2 as "from", floor(magnitude * 2) / 2 + 0.5 as "to", count(*)::int as count
-          from seismic.earthquakes where magnitude is not null and ${buildWhere(ctx.sql, filter)}
-          group by 1 order by 1`,
+        aggregates(`histogram:${argsKey(filter)}`, () =>
+          ctx.sql`
+            select floor(magnitude * 2) / 2 as "from", floor(magnitude * 2) / 2 + 0.5 as "to", count(*)::int as count
+            from seismic.earthquakes where magnitude is not null and ${buildWhere(ctx.sql, filter)}
+            group by 1 order by 1`.then((rows) => rows),
+        ),
       topSeismicCountries: (_: unknown, { filter, limit }: { filter?: EarthquakeFilter; limit: number }, ctx: Context) =>
-        ctx.sql`
-          select country_code as code, count(*)::int as count, max(magnitude)::float8 as "maxMagnitude", avg(magnitude)::float8 as "avgMagnitude"
-          from seismic.earthquakes where country_code is not null and ${buildWhere(ctx.sql, filter)}
-          group by country_code order by count desc limit ${clampFirst(limit, 10)}`.then((rows) =>
-          rows.map((r) => ({ ...r, country: { __typename: "Country", code: r.code } })),
+        aggregates(`top:${limit}:${argsKey(filter)}`, () =>
+          ctx.sql`
+            select country_code as code, count(*)::int as count, max(magnitude)::float8 as "maxMagnitude", avg(magnitude)::float8 as "avgMagnitude"
+            from seismic.earthquakes where country_code is not null and ${buildWhere(ctx.sql, filter)}
+            group by country_code order by count desc limit ${clampFirst(limit, 10)}`.then((rows) =>
+            rows.map((r) => ({ ...r, country: { __typename: "Country", code: r.code } })),
+          ),
         ),
       earthquakeTypes: (_: unknown, __: unknown, ctx: Context) =>
         ctx.sql`select distinct type from seismic.earthquakes order by type`.then((rows) => rows.map((r) => r.type)),

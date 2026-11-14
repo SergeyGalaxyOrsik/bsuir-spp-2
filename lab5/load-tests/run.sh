@@ -36,6 +36,10 @@ raise_limits() {
   echo ">> gateway: raising rate limits for throughput run"
   compose -f docker-compose.yml -f load-tests/compose.loadtest.yml up -d --no-deps gateway
   wait_gateway
+  # OrbStack/Docker re-binds the published port shortly after a container is recreated;
+  # without this pause the first seconds of the run can see "connection refused".
+  sleep 20
+  wait_gateway
 }
 
 restore_limits() {

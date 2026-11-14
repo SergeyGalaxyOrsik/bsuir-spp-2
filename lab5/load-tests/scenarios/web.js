@@ -49,7 +49,7 @@ const T = thinkMs(1000);
 
 export default function () {
   for (const [page, path] of pages) {
-    const res = http.get(WEB_URL + path(), { tags: { name: page, page }, headers: { accept: "text/html" } });
+    const res = http.get(WEB_URL + path(), { tags: { name: page, page }, headers: { accept: "text/html", "accept-encoding": "gzip" } });
     ssr.add(res.timings.duration, { page });
     check(res, {
       [`${page}: status 200`]: (r) => r.status === 200,

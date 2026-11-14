@@ -2,6 +2,7 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router"
 import {
   Activity,
   Braces,
+  Earth,
   Flame,
   Globe2,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils"
 
 const NAV = [
   { to: "/", label: "Обзор", icon: LayoutDashboard },
+  { to: "/live", label: "Пульс Земли", icon: Earth },
   { to: "/earthquakes", label: "Землетрясения", icon: Waves },
   { to: "/events", label: "Природные события", icon: Flame },
   { to: "/countries", label: "Страны", icon: Globe2 },
@@ -82,6 +84,7 @@ function Brand() {
 export function AppShell() {
   const { theme, setTheme } = useTheme()
   const [open, setOpen] = useState(false)
+  const fullBleed = useRouterState({ select: (s) => s.location.pathname === "/live" })
 
   // Global live feed: toast for every new significant earthquake the collector stores.
   useSubscription(LiveQuakes, { min: 4.5 }, (data) => {
@@ -139,7 +142,7 @@ export function AppShell() {
             </Button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 lg:px-8">
+        <main className={cn("w-full flex-1", fullBleed ? "min-h-0" : "mx-auto max-w-[1400px] px-4 py-6 lg:px-8")}>
           <Outlet />
         </main>
       </div>

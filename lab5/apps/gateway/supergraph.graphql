@@ -425,6 +425,18 @@ type WatchZone @join__type(graph: HAZARDS, key: "id") @join__type(graph: OPS, ke
   earthquakeCount(days: Int = 30): Int @join__field(graph: SEISMIC, requires: "latitude longitude radiusKm minMagnitude")
 }
 
+type Subscription @join__type(graph: HAZARDS) @join__type(graph: OPS) @join__type(graph: SEISMIC) {
+  """
+  Emitted when the collector stores a new natural event or a fresh observation of an existing one.
+  """
+  naturalEventUpdated(categoryIds: [ID!]): NaturalEvent! @join__field(graph: HAZARDS)
+  ingestRunUpdated(source: ID): IngestRun! @join__field(graph: OPS)
+  """
+  Fires when the collector stores a previously unseen earthquake.
+  """
+  earthquakeDetected(minMagnitude: Float = 0): Earthquake! @join__field(graph: SEISMIC)
+}
+
 type FieldError @join__type(graph: OPS) {
   field: String!
   message: String!
@@ -520,14 +532,6 @@ type Mutation @join__type(graph: OPS) {
   Asks the owning service to start a collector run; progress is streamed via `ingestRunUpdated`.
   """
   triggerIngest(source: ID!, mode: IngestMode = INCREMENTAL): TriggerIngestPayload!
-}
-
-type Subscription @join__type(graph: OPS) @join__type(graph: SEISMIC) {
-  ingestRunUpdated(source: ID): IngestRun! @join__field(graph: OPS)
-  """
-  Fires when the collector stores a previously unseen earthquake.
-  """
-  earthquakeDetected(minMagnitude: Float = 0): Earthquake! @join__field(graph: SEISMIC)
 }
 
 type Earthquake @join__type(graph: SEISMIC, key: "id") {

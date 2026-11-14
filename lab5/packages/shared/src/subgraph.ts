@@ -1,5 +1,6 @@
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { useOpenTelemetry } from "@envelop/opentelemetry";
+import { trace } from "@opentelemetry/api";
 import { usePrometheus } from "@graphql-yoga/plugin-prometheus";
 import { serve } from "@hono/node-server";
 import { parse } from "graphql";
@@ -36,7 +37,11 @@ export function startSubgraph<TContext extends object>(opts: SubgraphOptions<TCo
     maskedErrors: process.env.NODE_ENV === "production",
     context: opts.context,
     plugins: [
-      useOpenTelemetry({ resolvers: true, variables: true, result: false, document: true }, undefined, undefined, { "service.name": name }),
+      // Pass the global provider (registered by telemetry.ts → OTLP/Jaeger); without it the plugin
+      // falls back to its own provider that dumps every span to stdout.
+      useOpenTelemetry({ resolvers: true, variables: true, result: false, document: true }, trace.getTracerProvider(), undefined, {
+        "service.name": name,
+      }),
       usePrometheus({
         endpoint: false,
         registry,

@@ -16,6 +16,8 @@ data:
   RATE_LIMIT_BURST: "60"
   MAX_INFLIGHT_REQUESTS: "150"
   SEISMIC_BACKFILL_MONTHS: "24"
+  # Poll USGS every minute so the live globe gets new quakes quickly.
+  SEISMIC_INTERVAL_MS: "60000"
   HAZARDS_FROM_YEAR: "2019"
 ---
 # Local development credentials. In a real cluster these come from a secret manager.
